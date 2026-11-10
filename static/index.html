@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistema de Monitoreo Automatizado de Calidad del Agua</title>
+
+  <!-- Google Identity Services -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <!-- Chart.js para módulos complementarios -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Script de Autenticación -->
+  <script src="/static/auth.js"></script>
+
+  <!-- Configuración de ruta para WebAssembly -->
+  <script>
+    var Module = {
+      locateFile: function (path, prefix) {
+        if (path.endsWith(".wasm")) {
+          return "/static/" + path;
+        }
+        return prefix + path;
+      }
+    };
+  </script>
+
+  <style>
+    :root {
+      --bg-body: #f8fafc;
+      --bg-card: #ffffff;
+      --border-card: #e2e8f0;
+      --border-hover: #cbd5e1;
+      --text-title: #0f172a;
+      --text-body: #334155;
+      --text-muted: #64748b;
+      --accent-primary: #2563eb;
+      --accent-hover: #1d4ed8;
+      --accent-secondary: #0284c7;
+      --status-ok: #059669;
+      --status-warn: #d97706;
+      --status-orange: #ea580c;
+      --status-alert: #dc2626;
+      --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.07), 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
+      --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-body);
+      color: var(--text-body);
+      padding: 24px;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1240px;
+      margin: 0 auto;
+    }
+
+    /* Encabezado */
+    .header {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: 10px;
+      padding: 18px 24px;
+      margin-bottom: 24px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: var(--shadow-sm);
+      gap: 16px;
+    }
+
+    .header-titles h1 {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--text-title);
+      letter-spacing: -0.01em;
+    }
+
+    .header-titles p {
+      font-size: 0.86rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background-color: #ecfdf5;
+      border: 1px solid #a7f3d0;
+      color: var(--status-ok);
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .status-circle {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background-color: var(--status-ok);
+    }
+
+    .user-profile {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-left: 10px;
+      border-left: 1px solid var(--border-card);
+    }
+
+    .user-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 1px solid var(--border-card);
+      display: none;
+    }
+
+    .user-name {
+      font-size: 0.84rem;
+      font-weight: 600;
+      color: var(--text-title);
+    }
+
+    /* Secciones Generales */
+    .section-header {
+      margin-bottom: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .section-title {
+      font-size: 1.12rem;
+      font-weight: 700;
+      color: var(--text-title);
+    }
+
+    .card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: 10px;
+      box-shadow: var(--shadow-sm);
+      transition: box-shadow 0.2s ease, border-color 0.2s ease;
+    }
+
+    .card:hover {
+      box-shadow: var(--shadow-md);
+      border-color: var(--border-hover);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.84rem;
+      font-weight: 600;
+      padding: 8px 16px;
+      border-radius: 6px;
+      border: 1px solid var(--border-card);
+      cursor: pointer;
+      background-color: #f8fafc;
+      color: var(--text-title);
+      transition: all 0.15s ease-in-out;
+      text-decoration: none;
+    }
+
+    .btn:hover {
+      background-color: #f1f5f9;
+      border-color: #cbd5e1;
+    }
+
+    .btn-primary {
+      background-color: var(--accent-primary);
+      border-color: var(--accent-primary);
+      color: #ffffff;
+    }
+
+    .btn-primary:hover {
+      background-color: var(--accent-hover);
+      border-color: var(--accent-hover);
+    }
+
+    .btn-danger {
+      background-color: #fef2f2;
+      border: 1px solid #fecaca;
+      color: var(--status-alert);
+      padding: 6px 12px;
+      font-size: 0.8rem;
+    }
+
+    .btn-danger:hover {
+      background-color: #fee2e2;
+    }
+
+    .unit-pill {
+      font-size: 0.75rem;
+      font-weight: 600;
+      background-color: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: var(--accent-primary);
+      padding: 3px 10px;
+      border-radius: 12px;
+    }
+
+    /* Cuadrícula ThingSpeak / Neon */
+    .grid-thingspeak {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+      margin-bottom: 28px;
+    }
+
+    @media (max-width: 860px) {
+      .grid-thingspeak {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .ts-card {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .ts-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .ts-card-title {
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: var(--text-title);
+    }
+
+    .ts-frame-wrapper {
+      position: relative;
+      width: 100%;
+      height: 270px;
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid var(--border-card);
+      background-color: #ffffff;
+    }
+
+    .ts-frame-wrapper iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+
+    .ts-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 10px;
+    }
+
+    .ts-footer a {
+      font-size: 0.78rem;
+      color: var(--accent-primary);
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .ts-footer a:hover {
+      text-decoration: underline;
+    }
+
+    /* Módulo Edge Impulse */
+    .ml-card {
+      padding: 24px;
+      margin-bottom: 28px;
+    }
+
+    .ml-description {
+      font-size: 0.86rem;
+      color: var(--text-muted);
+      margin-bottom: 20px;
+      line-height: 1.6;
+    }
+
+    .ml-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      align-items: stretch;
+    }
+
+    @media (max-width: 768px) {
+      .ml-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .form-field {
+      margin-bottom: 14px;
+    }
+
+    .form-field label {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-title);
+      margin-bottom: 6px;
+    }
+
+    .form-field input {
+      width: 100%;
+      background-color: #ffffff;
+      border: 1px solid var(--border-card);
+      border-radius: 6px;
+      padding: 9px 12px;
+      font-size: 0.9rem;
+      color: var(--text-title);
+      outline: none;
+      transition: border-color 0.15s ease;
+    }
+
+    .form-field input:focus {
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    }
+
+    .result-display {
+      background-color: #f8fafc;
+      border: 1px solid var(--border-card);
+      border-radius: 8px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+    }
+
+    .result-caption {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .result-tag {
+      font-size: 1.35rem;
+      font-weight: 700;
+      margin: 12px 0 6px 0;
+      color: var(--text-muted);
+      transition: color 0.2s ease;
+    }
+
+    .result-confidence {
+      font-size: 0.84rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    /* Módulo DroidCam / Webcam */
+    .vision-card {
+      padding: 20px;
+      margin-bottom: 28px;
+    }
+
+    .vision-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+      border-bottom: 1px solid var(--border-card);
+      padding-bottom: 10px;
+    }
+
+    .vision-header span {
+      font-weight: 600;
+      font-size: 0.95rem;
+      color: var(--text-title);
+    }
+
+    .media-viewport {
+      width: 100%;
+      height: 380px;
+      background-color: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+      margin-bottom: 14px;
+    }
+
+    .media-viewport video,
+    .media-viewport canvas {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+
+    .toolbar-vision {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .toolbar-group {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    /* Panel estructurado de visión */
+    .vision-results-panel {
+      margin-top: 14px;
+      background-color: #f8fafc;
+      border: 1px solid var(--border-card);
+      border-radius: 8px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .vision-results-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .vr-title-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .vr-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--accent-primary);
+    }
+
+    .vr-title {
+      font-size: 0.84rem;
+      font-weight: 600;
+      color: var(--text-title);
+    }
+
+    .vr-counter-badge {
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      background-color: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: var(--accent-primary);
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+
+    .vr-chips-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .vr-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background-color: #ffffff;
+      border: 1px solid var(--border-card);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 0.86rem;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .vr-placeholder {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-style: italic;
+    }
+
+    /* Modal de Autenticación */
+    .auth-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      background-color: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(4px);
+      z-index: 99999;
+      justify-content: center;
+      align-items: center;
+      padding: 16px;
+    }
+
+    .auth-card {
+      background-color: #ffffff;
+      border: 1px solid var(--border-card);
+      border-radius: 12px;
+      width: 100%;
+      max-width: 420px;
+      padding: 32px 28px;
+      text-align: center;
+      box-shadow: var(--shadow-lg);
+    }
+
+    .auth-badge {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--accent-primary);
+      background-color: #eff6ff;
+      border: 1px solid #bfdbfe;
+      padding: 3px 10px;
+      border-radius: 12px;
+      margin-bottom: 12px;
+    }
+
+    .auth-card h2 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--text-title);
+      margin-bottom: 6px;
+    }
+
+    .auth-card p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 22px;
+    }
+
+    .auth-divider {
+      position: relative;
+      margin: 20px 0;
+    }
+
+    .auth-divider::before {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 0;
+      width: 100%;
+      height: 1px;
+      background-color: var(--border-card);
+    }
+
+    .auth-divider span {
+      position: relative;
+      background-color: #ffffff;
+      padding: 0 10px;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+    }
+
+    .google-container {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 16px;
+      min-height: 44px;
+    }
+
+    .btn-bypass {
+      background-color: transparent;
+      border: 1px dashed var(--border-card);
+      color: var(--text-muted);
+      font-size: 0.76rem;
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      width: 100%;
+      transition: all 0.15s ease;
+    }
+
+    .btn-bypass:hover {
+      background-color: #f8fafc;
+      border-color: #cbd5e1;
+      color: var(--text-title);
+    }
+
+    .footer {
+      text-align: center;
+      padding: 20px 0;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border-card);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+
+    <!-- Encabezado -->
+    <header class="header">
+      <div class="header-titles">
+        <h1>Sistema de Monitoreo Automatizado de Calidad del Agua</h1>
+        <p>Estación Central de Adquisición de Datos, Visión e Inteligencia Artificial</p>
+      </div>
+
+      <div class="header-controls">
+        <div class="status-badge">
+          <span class="status-circle"></span>
+          <span>En línea</span>
+        </div>
+
+        <div class="user-profile">
+          <img id="usuarioAvatar" class="user-avatar" alt="Avatar">
+          <span id="usuarioNombre" class="user-name">Operador</span>
+          <button type="button" class="btn btn-danger" onclick="cerrarSesion()">Salir</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- 1. Tablero de Telemetría (ThingSpeak & Neon PostgreSQL) -->
+    <section>
+      <div class="section-header">
+        <h2 class="section-title">Tablero de Telemetría en Tiempo Real (ThingSpeak IoT)</h2>
+      </div>
+
+      <div class="grid-thingspeak">
+        <!-- Tarjeta 1: Temperatura del Agua (Widget Gauge ThingSpeak) -->
+        <div class="card" style="background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; flex-direction: column; justify-content: space-between; min-height: 380px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h3 style="margin: 0; font-size: 1.15rem; font-weight: 600; color: #1e293b;">Temperatura del Agua</h3>
+            <span style="background-color: #eff6ff; color: #2563eb; font-size: 0.78rem; font-weight: 600; padding: 4px 10px; border-radius: 9999px;">
+              Canal 1: Grados Celsius (°C)
+            </span>
+          </div>
+
+          <div style="display: flex; justify-content: center; align-items: center; width: 100%; overflow: hidden; border-radius: 8px;">
+            <iframe width="450" height="260" style="border: 1px solid #cccccc;" src="https://thingspeak.com/channels/3543191/widgets/1319036"></iframe>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #f1f5f9; padding-top: 14px; margin-top: 10px;">
+            <span style="font-size: 0.88rem; color: #64748b; font-weight: 500;">Sensor DS18B20</span>
+            <a href="https://thingspeak.com/channels/3543191" target="_blank" rel="noopener" style="font-size: 0.78rem; color: var(--accent-primary); text-decoration: none;">Abrir en ThingSpeak</a>
+          </div>
+        </div>
+
+        <!-- Tarjeta 2: Nivel de Turbidez (Gráfico ThingSpeak) -->
+        <div class="card ts-card">
+          <div class="ts-card-header">
+            <span class="ts-card-title">Nivel de Turbidez</span>
+            <span class="unit-pill">Canal 2: Unidades NTU</span>
+          </div>
+          <div class="ts-frame-wrapper">
+            <iframe width="450" height="260" style="border: 1px solid #cccccc;" src="https://thingspeak.com/channels/3543191/charts/2?bgcolor=%23ffffff&color=%23d62020&dynamic=true&results=60&type=line&update=15"></iframe>
+          </div>
+          <div class="ts-footer">
+            <span>Sensor Óptico</span>
+            <a href="https://thingspeak.com/channels/3543191" target="_blank" rel="noopener">Abrir en ThingSpeak</a>
+          </div>
+        </div>
+
+        <!-- Tarjeta 3: Índice de Calidad (Desde tabla lecturas_calidad_agua de Neon DB) -->
+        <div class="card" style="background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; flex-direction: column; justify-content: space-between; min-height: 380px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h3 style="margin: 0; font-size: 1.15rem; font-weight: 600; color: #1e293b;">Índice de Calidad</h3>
+            <span id="badgeEstadoTexto" style="background-color: #dcfce7; color: #15803d; font-size: 0.8rem; font-weight: 600; padding: 4px 12px; border-radius: 9999px;">
+              Normal
+            </span>
+          </div>
+
+          <!-- Gráfico SVG con barras reactivas a Neon DB -->
+          <div style="border: 1px solid #e2e8f0; border-radius: 6px; padding: 15px 10px 10px 10px; background: #ffffff; display: flex; align-items: center; justify-content: center; height: 260px; box-sizing: border-box;">
+            <svg viewBox="0 0 420 220" width="100%" height="100%">
+              <line x1="20" y1="40" x2="400" y2="40" stroke="#f1f5f9" stroke-width="1" />
+              <line x1="20" y1="90" x2="400" y2="90" stroke="#f1f5f9" stroke-width="1" />
+              <line x1="20" y1="140" x2="400" y2="140" stroke="#f1f5f9" stroke-width="1" />
+              <line x1="20" y1="180" x2="400" y2="180" stroke="#cbd5e1" stroke-width="1.5" />
+
+              <rect id="bar-normal" x="42" y="30" width="60" height="150" rx="4" fill="#3b8276" style="transition: all 0.4s ease;" />
+              <rect id="bar-moderada" x="137" y="178" width="60" height="2" rx="4" fill="#cbd5e1" style="transition: all 0.4s ease;" />
+              <rect id="bar-regular" x="232" y="178" width="60" height="2" rx="4" fill="#cbd5e1" style="transition: all 0.4s ease;" />
+              <rect id="bar-critica" x="327" y="178" width="60" height="2" rx="4" fill="#cbd5e1" style="transition: all 0.4s ease;" />
+
+              <text x="72" y="198" text-anchor="middle" font-size="11" fill="#475569" font-weight="500">Óptima / Normal</text>
+              <text x="167" y="198" text-anchor="middle" font-size="11" fill="#475569" font-weight="500">Moderada</text>
+              <text x="262" y="198" text-anchor="middle" font-size="11" fill="#475569" font-weight="500">Regular</text>
+              <text x="357" y="198" text-anchor="middle" font-size="11" fill="#475569" font-weight="500">Crítica</text>
+            </svg>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 12px; border-top: 1px solid #f1f5f9; margin-top: 10px;">
+            <span style="font-size: 0.85rem; color: #64748b; font-weight: 500;">
+              Último estado detectado: <strong id="detalleEstadoUltimo" style="color: #1e293b;">Normal</strong>
+            </span>
+            <span style="font-size: 0.82rem; color: #10b981; font-weight: 600; display: flex; align-items: center; gap: 5px;">
+              <span style="width: 7px; height: 7px; background-color: #10b981; border-radius: 50%;"></span>
+              Neon DB
+            </span>
+          </div>
+        </div>
+
+        <!-- Tarjeta 4: Temperatura (Gráfico de Línea ThingSpeak) -->
+        <div class="card ts-card">
+          <div class="ts-card-header">
+            <span class="ts-card-title">Temperatura</span>
+          </div>
+          <div class="ts-frame-wrapper">
+            <iframe width="450" height="260" style="border: 1px solid #cccccc;" src="https://thingspeak.com/channels/3543191/charts/1?bgcolor=%23ffffff&color=%23d62020&dynamic=true&results=60&type=line&update=15"></iframe>
+          </div>
+          <div class="ts-footer">
+            <span>Sensor DS18B20</span>
+            <a href="https://thingspeak.com/channels/3543191" target="_blank" rel="noopener">Abrir en ThingSpeak</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. Clasificación Edge Impulse (WASM) -->
+    <section>
+      <div class="section-header">
+        <h2 class="section-title">Módulo de Clasificación con Inteligencia Artificial (Edge Impulse)</h2>
+      </div>
+
+      <div class="card ml-card">
+        <p class="ml-description">
+          Evaluación y clasificación en tiempo real ejecutada mediante el modelo compilado en WebAssembly. Ingrese los parámetros observados o espere a que se completen automáticamente desde los sensores.
+        </p>
+
+        <div class="ml-layout">
+          <form id="formInferencia" onsubmit="event.preventDefault(); predecirMuestra();">
+            <div class="form-field">
+              <label for="inputTurb">Turbidez (NTU):</label>
+              <input type="number" step="any" id="inputTurb" placeholder="Ejemplo: 12.5" required>
+            </div>
+
+            <div class="form-field">
+              <label for="inputTemp">Temperatura (°C):</label>
+              <input type="number" step="any" id="inputTemp" placeholder="Ejemplo: 24.5" required>
+            </div>
+
+            <button type="submit" class="btn btn-primary" id="btn-evaluar" style="width: 100%; margin-top: 6px;">
+              Evaluar Parámetros
+            </button>
+          </form>
+
+          <div class="result-display">
+            <span class="result-caption">Diagnóstico del Modelo (WASM)</span>
+            <div class="result-tag" id="resultadoEtiqueta">Cargando modelo...</div>
+            <span class="result-confidence" id="resultadoConfianza">Inicializando motor de inferencia</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. Módulo DroidCam / Webcam con Pipeline Keras -->
+    <section>
+      <div class="section-header">
+        <h2 class="section-title">Módulo de Inspección Visual y Análisis de Muestras (Keras CNN)</h2>
+      </div>
+
+      <div class="card vision-card">
+        <div class="vision-header">
+          <span>Transmisión y Captura en Tiempo Real</span>
+          <span class="unit-pill" id="camStatusBadge">Cámara en espera</span>
+        </div>
+
+        <div class="media-viewport">
+          <video id="videoCam" playsinline autoplay muted style="display: none;"></video>
+          <canvas id="canvasVision" width="640" height="480"></canvas>
+        </div>
+
+        <div class="toolbar-vision">
+          <div class="toolbar-group">
+            <button type="button" class="btn" id="btnToggleCam" onclick="toggleCamara()">Iniciar Transmisión DroidCam</button>
+            <button type="button" class="btn btn-primary" id="btnCapturar" onclick="capturarFotograma()" style="display: none;">Capturar Fotograma</button>
+            <button type="button" class="btn" onclick="document.getElementById('inputFotoLocal').click()">Cargar Imagen Local</button>
+            <input type="file" id="inputFotoLocal" accept="image/*" style="display: none;" onchange="procesarArchivoLocal(event)">
+          </div>
+          <div class="toolbar-group">
+            <button type="button" class="btn" onclick="limpiarVisor()">Restablecer Visor</button>
+          </div>
+        </div>
+
+        <div class="vision-results-panel" id="visionResultsPanel">
+          <div class="vision-results-header">
+            <div class="vr-title-group">
+              <span class="vr-dot"></span>
+              <span class="vr-title" id="statusMessage">Esperando muestra o transmisión en vivo...</span>
+            </div>
+            <span class="vr-counter-badge" id="vrTotalBadge">Efectividad > 85%</span>
+          </div>
+
+          <div class="vr-chips-container" id="vrChipsContainer">
+            <span class="vr-placeholder">No se han analizado fotogramas aún.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+
+    <footer class="footer">
+      Sistema IoT Integrado | Unidad Temática de Inteligencia Artificial
+    </footer>
+
+  </div>
+
+  <!-- Modal de Autenticación con Google -->
+  <div id="loginModal" class="auth-overlay">
+    <div class="auth-card">
+      <span class="auth-badge">Acceso Autorizado</span>
+      <h2>Control de Estación</h2>
+      <p>Inicie sesión con su cuenta institucional para acceder a la telemetría y diagnósticos.</p>
+
+      <div class="google-container" id="googleBtnContainer"></div>
+
+      <div class="auth-divider">
+        <span>Opciones de desarrollo</span>
+      </div>
+
+      <button type="button" class="btn-bypass" onclick="bypassDesarrollo()">
+        Acceso Rápido (Modo Laboratorio)
+      </button>
+    </div>
+  </div>
+
+  <!-- Botón Flotante de Chat IA -->
+  <button id="btnOpenChat" onclick="toggleChatPopup()" style="position: fixed; bottom: 24px; right: 24px; background-color: #2563eb; color: #ffffff; border: none; border-radius: 50px; padding: 12px 20px; font-weight: 600; box-shadow: 0 4px 14px rgba(37,99,235,0.4); cursor: pointer; display: flex; align-items: center; gap: 8px; z-index: 1000;">
+    <span>💬 Asistente IA</span>
+  </button>
+
+  <!-- Ventana Emergente Flotante del Chat -->
+  <div id="chatModalPopup" style="display: none; position: fixed; bottom: 80px; right: 24px; width: 380px; height: 500px; background-color: #ffffff; border-radius: 12px; border: 1px solid #cbd5e1; box-shadow: 0 10px 25px rgba(0,0,0,0.2); z-index: 1000; overflow: hidden; flex-direction: column;">
+    <div style="background-color: #2563eb; color: #ffffff; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center;">
+      <span style="font-weight: 600; font-size: 0.9rem;">Diagnóstico IA</span>
+      <button onclick="toggleChatPopup()" style="background: transparent; border: none; color: #ffffff; font-size: 1.1rem; cursor: pointer;">✕</button>
+    </div>
+    <iframe src="https://backend-iot-vision.onrender.com/chat-gui" style="width: 100%; height: 100%; border: none;"></iframe>
+  </div>
+
+  <!-- Scripts de Edge Impulse WASM -->
+  <script src="/static/edge-impulse-standalone.js"></script>
+  <script src="/static/run-impulse.js"></script>
+
+  <!-- Scripts de la Aplicación -->
+  <script src="/static/camera_vision.js?v=3.0"></script>
+  <script src="/static/dashboard.js"></script>
+
+  <!-- Script: Toggle del Chat Flotante -->
+  <script>
+    function toggleChatPopup() {
+      const popup = document.getElementById("chatModalPopup");
+      popup.style.display = (popup.style.display === "none" || popup.style.display === "") ? "flex" : "none";
+    }
+  </script>
+
+  <!-- Script: Captura de Cámara y Clasificación Visual -->
+  <script>
+    let videoStream = null;
+
+    async function toggleCamara() {
+      const video = document.getElementById("videoCam");
+      const btnToggle = document.getElementById("btnToggleCam");
+      const btnCapturar = document.getElementById("btnCapturar");
+      const badge = document.getElementById("camStatusBadge");
+
+      if (!videoStream) {
+        try {
+          videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+          video.srcObject = videoStream;
+          video.style.display = "block";
+          document.getElementById("canvasVision").style.display = "none";
+          btnToggle.innerText = "Detener Cámara";
+          btnCapturar.style.display = "inline-flex";
+          if (badge) badge.innerText = "Cámara transmitiendo";
+        } catch (err) {
+          alert("No se pudo acceder a la cámara o DroidCam.");
+        }
+      } else {
+        videoStream.getTracks().forEach(track => track.stop());
+        videoStream = null;
+        video.style.display = "none";
+        document.getElementById("canvasVision").style.display = "block";
+        btnToggle.innerText = "Iniciar Transmisión DroidCam";
+        btnCapturar.style.display = "none";
+        if (badge) badge.innerText = "Cámara en espera";
+      }
+    }
+
+    function capturarFotograma() {
+      const video = document.getElementById("videoCam");
+      const canvas = document.getElementById("canvasVision");
+      const ctx = canvas.getContext("2d");
+
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      toggleCamara();
+      canvas.toBlob(blob => enviarImagenABackend(blob), "image/jpeg", 0.95);
+    }
+
+    function procesarArchivoLocal(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const canvas = document.getElementById("canvasVision");
+      const ctx = canvas.getContext("2d");
+      const img = new Image();
+
+      img.onload = function() {
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+        enviarImagenABackend(file);
+      };
+      img.src = URL.createObjectURL(file);
+    }
+
+    async function enviarImagenABackend(blobOArchivo) {
+      const statusMsg = document.getElementById("statusMessage");
+      const chips = document.getElementById("vrChipsContainer");
+      const badge = document.getElementById("vrTotalBadge");
+
+      if (statusMsg) statusMsg.innerText = "Evaluando muestra con el modelo Keras...";
+
+      const formData = new FormData();
+      formData.append("file", blobOArchivo, "muestra.jpg");
+
+      // RUTA RELATIVA AL SERVIDOR LOCAL EN FASTAPI
+      const BACKEND_URL = "/api/vision/clasificar-muestra";
+
+      try {
+        const res = await fetch(BACKEND_URL, {
+          method: "POST",
+          body: formData
+        });
+
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(`Error ${res.status}: ${errText}`);
+        }
+
+        const data = await res.json();
+
+        if (statusMsg) statusMsg.innerText = `Diagnóstico: ${data.diagnostico}`;
+        if (badge) badge.innerText = `Confianza: ${data.confianza}`;
+
+        if (chips) {
+          let estiloColor = "#10b981"; // Verde (Limpia)
+          const diagLower = (data.diagnostico || "").toLowerCase();
+          if (diagLower.includes("leve") || diagLower.includes("precaución") || diagLower.includes("moderada")) {
+            estiloColor = "#f59e0b"; // Ámbar
+          } else if (diagLower.includes("turbi") || diagLower.includes("crítica") || diagLower.includes("alga")) {
+            estiloColor = "#ef4444"; // Rojo
+          }
+
+          chips.innerHTML = `
+            <div class="vr-chip">
+              <span style="font-weight: 600; color: #1e293b;">${data.diagnostico}</span>
+              <span style="background-color: ${estiloColor}; color: #ffffff; border-radius: 12px; padding: 2px 8px; font-size: 0.76rem; font-weight: 700;">
+                ${data.confianza}
+              </span>
+            </div>
+          `;
+        }
+      } catch (err) {
+        console.error("Fallo detallado al procesar imagen:", err);
+        if (statusMsg) statusMsg.innerText = `Fallo al procesar: ${err.message || "Error en red o API"}`;
+      }
+    }
+
+    function limpiarVisor() {
+      const canvas = document.getElementById("canvasVision");
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      document.getElementById("statusMessage").innerText = "Esperando muestra...";
+      document.getElementById("vrChipsContainer").innerHTML = '<span class="vr-placeholder">No se han analizado fotogramas aún.</span>';
+    }
+  </script>
+
+  <!-- Script: Consulta y Renderizado de Estados desde Neon PostgreSQL -->
+  <script>
+    const API_ENDPOINT_TELEMETRIA = "https://cienega-api-2.onrender.com/api/telemetria";
+
+    function renderizarBarrasEstado(estadoRecibido) {
+      if (!estadoRecibido) return;
+      const estado = estadoRecibido.toString().toLowerCase().trim();
+
+      const bNormal = document.getElementById("bar-normal");
+      const bModerada = document.getElementById("bar-moderada");
+      const bRegular = document.getElementById("bar-regular");
+      const bCritica = document.getElementById("bar-critica");
+      const badge = document.getElementById("badgeEstadoTexto");
+      const label = document.getElementById("detalleEstadoUltimo");
+
+      // 1. Resetear todas las barras abajo
+      [bNormal, bModerada, bRegular, bCritica].forEach(b => {
+        if (b) {
+          b.setAttribute("y", "178");
+          b.setAttribute("height", "2");
+          b.setAttribute("fill", "#cbd5e1");
+        }
+      });
+
+      // 2. Actualizar texto de estado
+      if (label) {
+        label.textContent = estadoRecibido;
+      }
+
+      // 3. Activar barra y estilo según la telemetría registrada
+      if (estado.includes("critica") || estado.includes("crítica")) {
+        if (bCritica) {
+          bCritica.setAttribute("y", "30");
+          bCritica.setAttribute("height", "150");
+          bCritica.setAttribute("fill", "#ef4444");
+        }
+        if (badge) {
+          badge.textContent = "Crítica";
+          badge.style.backgroundColor = "#fee2e2";
+          badge.style.color = "#b91c1c";
+        }
+      } else if (estado.includes("regular") || estado.includes("alerta")) {
+        if (bRegular) {
+          bRegular.setAttribute("y", "30");
+          bRegular.setAttribute("height", "150");
+          bRegular.setAttribute("fill", "#f59e0b");
+        }
+        if (badge) {
+          badge.textContent = "Regular";
+          badge.style.backgroundColor = "#fef3c7";
+          badge.style.color = "#b45309";
+        }
+      } else if (estado.includes("moderada")) {
+        if (bModerada) {
+          bModerada.setAttribute("y", "30");
+          bModerada.setAttribute("height", "150");
+          bModerada.setAttribute("fill", "#3b82f6");
+        }
+        if (badge) {
+          badge.textContent = "Moderada";
+          badge.style.backgroundColor = "#dbeafe";
+          badge.style.color = "#1d4ed8";
+        }
+      } else {
+        if (bNormal) {
+          bNormal.setAttribute("y", "30");
+          bNormal.setAttribute("height", "150");
+          bNormal.setAttribute("fill", "#3b8276");
+        }
+        if (badge) {
+          badge.textContent = "Normal";
+          badge.style.backgroundColor = "#dcfce7";
+          badge.style.color = "#15803d";
+        }
+      }
+    }
+
+    async function actualizarEstadoDesdeNeon() {
+      try {
+        const respuesta = await fetch(API_ENDPOINT_TELEMETRIA);
+        if (!respuesta.ok) return;
+        const telemetria = await respuesta.json();
+        if (telemetria && telemetria.estado) {
+          renderizarBarrasEstado(telemetria.estado);
+        }
+      } catch (err) {
+        console.error("Error al consultar telemetría:", err);
+      }
+    }
+
+    // Consulta periódica cada 3 segundos
+    actualizarEstadoDesdeNeon();
+    setInterval(actualizarEstadoDesdeNeon, 3000);
+  </script>
+
+</body>
+</html>

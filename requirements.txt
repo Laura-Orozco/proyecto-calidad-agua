@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+paho-mqtt
+fpdf2
+python-multipart
+pillow
+numpy
+requests
