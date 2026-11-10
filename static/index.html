@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -25,9 +25,11 @@
   </script>
 
   <style>
-    :root {
+    /* VARIABLES: TEMA OSCURO POR DEFECTO */
+    :root, [data-theme="dark"] {
       --bg-body: #0b1120;
       --bg-card: #0f172a;
+      --bg-inner: #020617;
       --border-card: #1e293b;
       --border-hover: #334155;
       --text-title: #f8fafc;
@@ -38,8 +40,31 @@
       --status-ok: #10b981;
       --status-warn: #f59e0b;
       --status-alert: #ef4444;
-      --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.3);
-      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+      --btn-bg: #1e293b;
+      --btn-hover: #334155;
+      --ts-bg: #0f172a;
+      --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+    }
+
+    /* VARIABLES: TEMA CLARO */
+    [data-theme="light"] {
+      --bg-body: #f8fafc;
+      --bg-card: #ffffff;
+      --bg-inner: #f1f5f9;
+      --border-card: #e2e8f0;
+      --border-hover: #cbd5e1;
+      --text-title: #0f172a;
+      --text-body: #334155;
+      --text-muted: #64748b;
+      --accent-primary: #2563eb;
+      --accent-hover: #1d4ed8;
+      --status-ok: #059669;
+      --status-warn: #d97706;
+      --status-alert: #dc2626;
+      --btn-bg: #f8fafc;
+      --btn-hover: #e2e8f0;
+      --ts-bg: #ffffff;
+      --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.08);
     }
 
     * {
@@ -47,6 +72,7 @@
       margin: 0;
       padding: 0;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease;
     }
 
     body {
@@ -71,7 +97,7 @@
       flex-wrap: wrap;
       justify-content: space-between;
       align-items: center;
-      box-shadow: var(--shadow-sm);
+      box-shadow: var(--shadow-card);
       gap: 16px;
     }
 
@@ -91,14 +117,33 @@
     .header-controls {
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 12px;
+    }
+
+    /* Switch de Tema */
+    .theme-toggle-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      background-color: var(--btn-bg);
+      border: 1px solid var(--border-card);
+      color: var(--text-title);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .theme-toggle-btn:hover {
+      background-color: var(--btn-hover);
     }
 
     .status-badge {
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      background-color: rgba(16, 185, 129, 0.1);
+      background-color: rgba(16, 185, 129, 0.12);
       border: 1px solid rgba(16, 185, 129, 0.3);
       color: var(--status-ok);
       padding: 5px 12px;
@@ -154,8 +199,7 @@
       background-color: var(--bg-card);
       border: 1px solid var(--border-card);
       border-radius: 12px;
-      box-shadow: var(--shadow-sm);
-      transition: all 0.2s ease;
+      box-shadow: var(--shadow-card);
     }
 
     .btn {
@@ -168,14 +212,13 @@
       border-radius: 6px;
       border: 1px solid var(--border-card);
       cursor: pointer;
-      background-color: #1e293b;
+      background-color: var(--btn-bg);
       color: var(--text-title);
-      transition: all 0.15s ease-in-out;
       text-decoration: none;
     }
 
     .btn:hover {
-      background-color: #334155;
+      background-color: var(--btn-hover);
       border-color: var(--border-hover);
     }
 
@@ -190,7 +233,7 @@
     }
 
     .btn-danger {
-      background-color: rgba(239, 68, 68, 0.15);
+      background-color: rgba(239, 68, 68, 0.12);
       border: 1px solid rgba(239, 68, 68, 0.3);
       color: var(--status-alert);
       padding: 6px 12px;
@@ -202,7 +245,7 @@
       font-weight: 600;
       background-color: rgba(59, 130, 246, 0.15);
       border: 1px solid rgba(59, 130, 246, 0.3);
-      color: #60a5fa;
+      color: var(--accent-primary);
       padding: 3px 10px;
       border-radius: 12px;
     }
@@ -273,17 +316,17 @@
 
     .form-field input {
       width: 100%;
-      background-color: #1e293b;
+      background-color: var(--bg-inner);
       border: 1px solid var(--border-card);
       border-radius: 6px;
       padding: 9px 12px;
       font-size: 0.9rem;
-      color: #ffffff;
+      color: var(--text-title);
       outline: none;
     }
 
     .result-display {
-      background-color: #1e293b;
+      background-color: var(--bg-inner);
       border: 1px solid var(--border-card);
       border-radius: 8px;
       padding: 24px;
@@ -301,7 +344,7 @@
 
     .media-viewport {
       background-color: #020617;
-      border: 1px solid #1e293b;
+      border: 1px solid var(--border-card);
       border-radius: 10px;
       display: flex;
       justify-content: center;
@@ -341,10 +384,10 @@
       right: 24px;
       width: 390px;
       height: 530px;
-      background-color: #0f172a;
+      background-color: var(--bg-card);
       border-radius: 18px;
-      border: 1px solid #334155;
-      box-shadow: 0 20px 35px rgba(0, 0, 0, 0.5);
+      border: 1px solid var(--border-card);
+      box-shadow: 0 20px 35px rgba(0, 0, 0, 0.4);
       z-index: 1000;
       overflow: hidden;
       flex-direction: column;
@@ -363,7 +406,7 @@
 
   <div class="container">
 
-    <!-- Encabezado -->
+    <!-- Encabezado con selector de tema -->
     <header class="header">
       <div class="header-titles">
         <h1>Sistema de Monitoreo Automatizado de Calidad del Agua</h1>
@@ -371,6 +414,12 @@
       </div>
 
       <div class="header-controls">
+        <!-- Botón para alternar Tema -->
+        <button type="button" id="themeToggleBtn" class="theme-toggle-btn" onclick="alternarTema()">
+          <span id="themeIcon">☀️</span>
+          <span id="themeLabel">Modo Claro</span>
+        </button>
+
         <div class="status-badge">
           <span class="status-circle"></span>
           <span>En línea</span>
@@ -393,63 +442,63 @@
       <div class="grid-thingspeak">
         <div class="card" style="padding: 20px; display: flex; flex-direction: column; justify-content: space-between; min-height: 380px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-            <h3 style="font-size: 1.1rem; color: #f8fafc;">Temperatura del Agua</h3>
+            <h3 style="font-size: 1.1rem; color: var(--text-title);">Temperatura del Agua</h3>
             <span class="unit-pill">Canal 1: °C</span>
           </div>
           <div style="display: flex; justify-content: center; width: 100%; border-radius: 8px; overflow: hidden;">
-            <iframe width="450" height="260" style="border: 1px solid #1e293b;" src="https://thingspeak.com/channels/3543191/widgets/1319036"></iframe>
+            <iframe width="450" height="260" style="border: 1px solid var(--border-card);" src="https://thingspeak.com/channels/3543191/widgets/1319036"></iframe>
           </div>
           <div style="display: flex; justify-content: space-between; margin-top: 10px;">
             <span style="font-size: 0.85rem; color: var(--text-muted);">Sensor DS18B20</span>
-            <a href="https://thingspeak.com/channels/3543191" target="_blank" rel="noopener" style="font-size: 0.8rem; color: #60a5fa; text-decoration: none;">ThingSpeak ↗</a>
+            <a href="https://thingspeak.com/channels/3543191" target="_blank" rel="noopener" style="font-size: 0.8rem; color: var(--accent-primary); text-decoration: none;">ThingSpeak ↗</a>
           </div>
         </div>
 
         <div class="card ts-card">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-            <span style="font-size: 1.1rem; font-weight: 600; color: #f8fafc;">Nivel de Turbidez</span>
+            <span style="font-size: 1.1rem; font-weight: 600; color: var(--text-title);">Nivel de Turbidez</span>
             <span class="unit-pill">Canal 2: NTU</span>
           </div>
           <div class="ts-frame-wrapper">
-            <iframe width="450" height="260" style="border: 1px solid #1e293b;" src="https://thingspeak.com/channels/3543191/charts/2?bgcolor=%230f172a&color=%23ef4444&dynamic=true&results=60&type=line&update=15"></iframe>
+            <iframe id="iframeTurbidez" width="450" height="260" style="border: 1px solid var(--border-card);" src="https://thingspeak.com/channels/3543191/charts/2?bgcolor=%230f172a&color=%23ef4444&dynamic=true&results=60&type=line&update=15"></iframe>
           </div>
           <div style="display: flex; justify-content: space-between; margin-top: 10px;">
             <span style="font-size: 0.85rem; color: var(--text-muted);">Sensor Óptico</span>
-            <a href="https://thingspeak.com/channels/3543191" target="_blank" rel="noopener" style="font-size: 0.8rem; color: #60a5fa; text-decoration: none;">ThingSpeak ↗</a>
+            <a href="https://thingspeak.com/channels/3543191" target="_blank" rel="noopener" style="font-size: 0.8rem; color: var(--accent-primary); text-decoration: none;">ThingSpeak ↗</a>
           </div>
         </div>
 
         <!-- Tarjeta 3: Índice de Calidad reactivo a Neon -->
         <div class="card" style="padding: 20px; display: flex; flex-direction: column; justify-content: space-between; min-height: 380px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-            <h3 style="font-size: 1.1rem; color: #f8fafc;">Índice de Calidad</h3>
-            <span id="badgeEstadoTexto" style="background-color: rgba(16, 185, 129, 0.15); color: #34d399; font-size: 0.8rem; font-weight: 600; padding: 4px 12px; border-radius: 9999px;">
+            <h3 style="font-size: 1.1rem; color: var(--text-title);">Índice de Calidad</h3>
+            <span id="badgeEstadoTexto" style="background-color: rgba(16, 185, 129, 0.15); color: #10b981; font-size: 0.8rem; font-weight: 600; padding: 4px 12px; border-radius: 9999px;">
               Normal
             </span>
           </div>
 
-          <div style="border: 1px solid #1e293b; border-radius: 8px; padding: 15px; background: #0b1120; display: flex; align-items: center; justify-content: center; height: 260px;">
+          <div style="border: 1px solid var(--border-card); border-radius: 8px; padding: 15px; background: var(--bg-inner); display: flex; align-items: center; justify-content: center; height: 260px;">
             <svg viewBox="0 0 420 220" width="100%" height="100%">
-              <line x1="20" y1="40" x2="400" y2="40" stroke="#1e293b" stroke-width="1" />
-              <line x1="20" y1="90" x2="400" y2="90" stroke="#1e293b" stroke-width="1" />
-              <line x1="20" y1="140" x2="400" y2="140" stroke="#1e293b" stroke-width="1" />
-              <line x1="20" y1="180" x2="400" y2="180" stroke="#334155" stroke-width="1.5" />
+              <line x1="20" y1="40" x2="400" y2="40" stroke="var(--border-card)" stroke-width="1" />
+              <line x1="20" y1="90" x2="400" y2="90" stroke="var(--border-card)" stroke-width="1" />
+              <line x1="20" y1="140" x2="400" y2="140" stroke="var(--border-card)" stroke-width="1" />
+              <line x1="20" y1="180" x2="400" y2="180" stroke="var(--border-hover)" stroke-width="1.5" />
 
               <rect id="bar-normal" x="42" y="30" width="60" height="150" rx="4" fill="#10b981" style="transition: all 0.4s ease;" />
-              <rect id="bar-moderada" x="137" y="178" width="60" height="2" rx="4" fill="#334155" style="transition: all 0.4s ease;" />
-              <rect id="bar-regular" x="232" y="178" width="60" height="2" rx="4" fill="#334155" style="transition: all 0.4s ease;" />
-              <rect id="bar-critica" x="327" y="178" width="60" height="2" rx="4" fill="#334155" style="transition: all 0.4s ease;" />
+              <rect id="bar-moderada" x="137" y="178" width="60" height="2" rx="4" fill="var(--border-card)" style="transition: all 0.4s ease;" />
+              <rect id="bar-regular" x="232" y="178" width="60" height="2" rx="4" fill="var(--border-card)" style="transition: all 0.4s ease;" />
+              <rect id="bar-critica" x="327" y="178" width="60" height="2" rx="4" fill="var(--border-card)" style="transition: all 0.4s ease;" />
 
-              <text x="72" y="198" text-anchor="middle" font-size="11" fill="#94a3b8" font-weight="500">Óptima / Normal</text>
-              <text x="167" y="198" text-anchor="middle" font-size="11" fill="#94a3b8" font-weight="500">Moderada</text>
-              <text x="262" y="198" text-anchor="middle" font-size="11" fill="#94a3b8" font-weight="500">Regular</text>
-              <text x="357" y="198" text-anchor="middle" font-size="11" fill="#94a3b8" font-weight="500">Crítica</text>
+              <text x="72" y="198" text-anchor="middle" font-size="11" fill="var(--text-muted)" font-weight="500">Óptima / Normal</text>
+              <text x="167" y="198" text-anchor="middle" font-size="11" fill="var(--text-muted)" font-weight="500">Moderada</text>
+              <text x="262" y="198" text-anchor="middle" font-size="11" fill="var(--text-muted)" font-weight="500">Regular</text>
+              <text x="357" y="198" text-anchor="middle" font-size="11" fill="var(--text-muted)" font-weight="500">Crítica</text>
             </svg>
           </div>
 
           <div style="display: flex; justify-content: space-between; margin-top: 10px;">
             <span style="font-size: 0.85rem; color: var(--text-muted);">
-              Estado IoT: <strong id="detalleEstadoUltimo" style="color: #f8fafc;">Normal</strong>
+              Estado IoT: <strong id="detalleEstadoUltimo" style="color: var(--text-title);">Normal</strong>
             </span>
             <span style="font-size: 0.8rem; color: #10b981; font-weight: 600;">● Neon DB</span>
           </div>
@@ -457,14 +506,14 @@
 
         <div class="card ts-card">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-            <span style="font-size: 1.1rem; font-weight: 600; color: #f8fafc;">Tendencia Térmica</span>
+            <span style="font-size: 1.1rem; font-weight: 600; color: var(--text-title);">Tendencia Térmica</span>
           </div>
           <div class="ts-frame-wrapper">
-            <iframe width="450" height="260" style="border: 1px solid #1e293b;" src="https://thingspeak.com/channels/3543191/charts/1?bgcolor=%230f172a&color=%233b82f6&dynamic=true&results=60&type=line&update=15"></iframe>
+            <iframe id="iframeTemperatura" width="450" height="260" style="border: 1px solid var(--border-card);" src="https://thingspeak.com/channels/3543191/charts/1?bgcolor=%230f172a&color=%233b82f6&dynamic=true&results=60&type=line&update=15"></iframe>
           </div>
           <div style="display: flex; justify-content: space-between; margin-top: 10px;">
             <span style="font-size: 0.85rem; color: var(--text-muted);">Registro Histórico</span>
-            <a href="https://thingspeak.com/channels/3543191" target="_blank" rel="noopener" style="font-size: 0.8rem; color: #60a5fa; text-decoration: none;">ThingSpeak ↗</a>
+            <a href="https://thingspeak.com/channels/3543191" target="_blank" rel="noopener" style="font-size: 0.8rem; color: var(--accent-primary); text-decoration: none;">ThingSpeak ↗</a>
           </div>
         </div>
       </div>
@@ -494,7 +543,7 @@
 
           <div class="result-display">
             <span style="font-size: 0.78rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Diagnóstico WASM</span>
-            <div id="resultadoEtiqueta" style="font-size: 1.35rem; font-weight: 700; margin: 10px 0; color: #f8fafc;">Cargando modelo...</div>
+            <div id="resultadoEtiqueta" style="font-size: 1.35rem; font-weight: 700; margin: 10px 0; color: var(--text-title);">Cargando modelo...</div>
             <span id="resultadoConfianza" style="font-size: 0.84rem; color: var(--text-muted);">Inicializando motor de inferencia</span>
           </div>
         </div>
@@ -524,7 +573,7 @@
 
           <!-- Visor Grad-CAM XAI -->
           <div style="display: flex; flex-direction: column; gap: 8px;">
-            <span style="font-size: 0.78rem; font-weight: 700; color: #60a5fa; text-transform: uppercase;">
+            <span style="font-size: 0.78rem; font-weight: 700; color: var(--accent-primary); text-transform: uppercase;">
               🔍 Mapa de Calor de Activación (Regiones de Atención de la IA)
             </span>
             <div class="media-viewport" style="height: 310px;">
@@ -548,61 +597,61 @@
         </div>
 
         <!-- Métricas, Softmax Breakdown y Fusión Multimodal -->
-        <div style="background: #020617; border: 1px solid #1e293b; border-radius: 10px; padding: 18px;">
+        <div style="background: var(--bg-inner); border: 1px solid var(--border-card); border-radius: 10px; padding: 18px;">
           
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; border-bottom: 1px solid #1e293b; padding-bottom: 10px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; border-bottom: 1px solid var(--border-card); padding-bottom: 10px;">
             <div style="display: flex; align-items: center; gap: 8px;">
-              <span style="width: 9px; height: 9px; border-radius: 50%; background: #3b82f6; display: inline-block;"></span>
-              <strong id="statusMessage" style="font-size: 0.95rem; color: #f8fafc;">Listo para inferencia explicable</strong>
+              <span style="width: 9px; height: 9px; border-radius: 50%; background: var(--accent-primary); display: inline-block;"></span>
+              <strong id="statusMessage" style="font-size: 0.95rem; color: var(--text-title);">Listo para inferencia explicable</strong>
             </div>
             <div style="display: flex; gap: 8px;">
-              <span id="metricLatencia" style="font-size: 0.75rem; background: #0f172a; border: 1px solid #1e293b; color: #94a3b8; padding: 2px 8px; border-radius: 6px; font-family: monospace;">Inferencia: -- ms</span>
+              <span id="metricLatencia" style="font-size: 0.75rem; background: var(--bg-card); border: 1px solid var(--border-card); color: var(--text-muted); padding: 2px 8px; border-radius: 6px; font-family: monospace;">Inferencia: -- ms</span>
               <span id="vrTotalBadge" class="unit-pill">Efectividad > 85%</span>
             </div>
           </div>
 
-          <span style="font-size: 0.76rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 10px; display: block;">
+          <span style="font-size: 0.76rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 10px; display: block;">
             Desglose de Probabilidades (Softmax Breakdown)
           </span>
 
           <div style="display: flex; flex-direction: column; gap: 9px; margin-bottom: 18px;">
             <div>
-              <div style="display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 600; margin-bottom: 4px;">
+              <div style="display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 600; margin-bottom: 4px; color: var(--text-title);">
                 <span>Agua Limpia / Óptima</span>
                 <span id="prob-optima">0.0%</span>
               </div>
-              <div style="width: 100%; height: 7px; background: #0f172a; border-radius: 4px; overflow: hidden;">
+              <div style="width: 100%; height: 7px; background: var(--border-card); border-radius: 4px; overflow: hidden;">
                 <div id="bar-prob-optima" style="width: 0%; height: 100%; background: #10b981; transition: width 0.4s ease;"></div>
               </div>
             </div>
 
             <div>
-              <div style="display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 600; margin-bottom: 4px;">
+              <div style="display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 600; margin-bottom: 4px; color: var(--text-title);">
                 <span>Levemente Túrbida / Precaución</span>
                 <span id="prob-moderada">0.0%</span>
               </div>
-              <div style="width: 100%; height: 7px; background: #0f172a; border-radius: 4px; overflow: hidden;">
+              <div style="width: 100%; height: 7px; background: var(--border-card); border-radius: 4px; overflow: hidden;">
                 <div id="bar-prob-moderada" style="width: 0%; height: 100%; background: #f59e0b; transition: width 0.4s ease;"></div>
               </div>
             </div>
 
             <div>
-              <div style="display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 600; margin-bottom: 4px;">
+              <div style="display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 600; margin-bottom: 4px; color: var(--text-title);">
                 <span>Alta Turbidez / Crítica</span>
                 <span id="prob-critica">0.0%</span>
               </div>
-              <div style="width: 100%; height: 7px; background: #0f172a; border-radius: 4px; overflow: hidden;">
+              <div style="width: 100%; height: 7px; background: var(--border-card); border-radius: 4px; overflow: hidden;">
                 <div id="bar-prob-critica" style="width: 0%; height: 100%; background: #ef4444; transition: width 0.4s ease;"></div>
               </div>
             </div>
           </div>
 
           <!-- Fusión Multimodal -->
-          <div style="background: rgba(15, 23, 42, 0.6); border: 1px dashed #334155; border-radius: 8px; padding: 12px 16px; font-size: 0.84rem; display: flex; align-items: flex-start; gap: 10px;">
+          <div style="background: var(--bg-card); border: 1px dashed var(--border-card); border-radius: 8px; padding: 12px 16px; font-size: 0.84rem; display: flex; align-items: flex-start; gap: 10px;">
             <span style="font-size: 1.2rem; line-height: 1;">⚡</span>
             <div>
-              <strong style="color: #f8fafc;">Fusión Multimodal (Sensores + Visión):</strong>
-              <div id="txtVeredictoMultimodal" style="margin-top: 3px; color: #cbd5e1;">
+              <strong style="color: var(--text-title);">Fusión Multimodal (Sensores + Visión):</strong>
+              <div id="txtVeredictoMultimodal" style="margin-top: 3px; color: var(--text-body);">
                 Esperando captura visual para correlacionar con telemetría en tiempo real y mapa de calor.
               </div>
             </div>
@@ -644,6 +693,45 @@
   <script src="/static/edge-impulse-standalone.js"></script>
   <script src="/static/run-impulse.js"></script>
   <script src="/static/dashboard.js"></script>
+
+  <!-- Script: Alternador y Persistencia de Tema Claro / Oscuro -->
+  <script>
+    function aplicarTema(tema) {
+      document.documentElement.setAttribute("data-theme", tema);
+      localStorage.setItem("tema_seleccionado", tema);
+
+      const icon = document.getElementById("themeIcon");
+      const label = document.getElementById("themeLabel");
+      const ifrTurb = document.getElementById("iframeTurbidez");
+      const ifrTemp = document.getElementById("iframeTemperatura");
+
+      if (tema === "light") {
+        if (icon) icon.textContent = "🌙";
+        if (label) label.textContent = "Modo Oscuro";
+        // Actualizar fondo de gráficos ThingSpeak a blanco
+        if (ifrTurb) ifrTurb.src = "https://thingspeak.com/channels/3543191/charts/2?bgcolor=%23ffffff&color=%23ef4444&dynamic=true&results=60&type=line&update=15";
+        if (ifrTemp) ifrTemp.src = "https://thingspeak.com/channels/3543191/charts/1?bgcolor=%23ffffff&color=%232563eb&dynamic=true&results=60&type=line&update=15";
+      } else {
+        if (icon) icon.textContent = "☀️";
+        if (label) label.textContent = "Modo Claro";
+        // Actualizar fondo de gráficos ThingSpeak a oscuro
+        if (ifrTurb) ifrTurb.src = "https://thingspeak.com/channels/3543191/charts/2?bgcolor=%230f172a&color=%23ef4444&dynamic=true&results=60&type=line&update=15";
+        if (ifrTemp) ifrTemp.src = "https://thingspeak.com/channels/3543191/charts/1?bgcolor=%230f172a&color=%233b82f6&dynamic=true&results=60&type=line&update=15";
+      }
+    }
+
+    function alternarTema() {
+      const actual = document.documentElement.getAttribute("data-theme") || "dark";
+      const nuevo = (actual === "dark") ? "light" : "dark";
+      aplicarTema(nuevo);
+    }
+
+    // Cargar preferencia guardada
+    document.addEventListener("DOMContentLoaded", () => {
+      const temaGuardado = localStorage.getItem("tema_seleccionado") || "dark";
+      aplicarTema(temaGuardado);
+    });
+  </script>
 
   <!-- Control del Chat Flotante -->
   <script>
@@ -866,7 +954,7 @@
         if (b) {
           b.setAttribute("y", "178");
           b.setAttribute("height", "2");
-          b.setAttribute("fill", "#334155");
+          b.setAttribute("fill", "var(--border-card)");
         }
       });
 
@@ -874,16 +962,16 @@
 
       if (estado.includes("critica") || estado.includes("crítica")) {
         if (bCritica) { bCritica.setAttribute("y", "30"); bCritica.setAttribute("height", "150"); bCritica.setAttribute("fill", "#ef4444"); }
-        if (badge) { badge.textContent = "Crítica"; badge.style.backgroundColor = "rgba(239,68,68,0.2)"; badge.style.color = "#f87171"; }
+        if (badge) { badge.textContent = "Crítica"; badge.style.backgroundColor = "rgba(239,68,68,0.2)"; badge.style.color = "#ef4444"; }
       } else if (estado.includes("regular") || estado.includes("alerta")) {
         if (bRegular) { bRegular.setAttribute("y", "30"); bRegular.setAttribute("height", "150"); bRegular.setAttribute("fill", "#f59e0b"); }
-        if (badge) { badge.textContent = "Regular"; badge.style.backgroundColor = "rgba(245,158,11,0.2)"; badge.style.color = "#fbbf24"; }
+        if (badge) { badge.textContent = "Regular"; badge.style.backgroundColor = "rgba(245,158,11,0.2)"; badge.style.color = "#f59e0b"; }
       } else if (estado.includes("moderada")) {
         if (bModerada) { bModerada.setAttribute("y", "30"); bModerada.setAttribute("height", "150"); bModerada.setAttribute("fill", "#3b82f6"); }
-        if (badge) { badge.textContent = "Moderada"; badge.style.backgroundColor = "rgba(59,130,246,0.2)"; badge.style.color = "#60a5fa"; }
+        if (badge) { badge.textContent = "Moderada"; badge.style.backgroundColor = "rgba(59,130,246,0.2)"; badge.style.color = "#3b82f6"; }
       } else {
         if (bNormal) { bNormal.setAttribute("y", "30"); bNormal.setAttribute("height", "150"); bNormal.setAttribute("fill", "#10b981"); }
-        if (badge) { badge.textContent = "Normal"; badge.style.backgroundColor = "rgba(16,185,129,0.2)"; badge.style.color = "#34d399"; }
+        if (badge) { badge.textContent = "Normal"; badge.style.backgroundColor = "rgba(16,185,129,0.2)"; badge.style.color = "#10b981"; }
       }
     }
 
