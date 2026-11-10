@@ -30,7 +30,7 @@ def predecir_imagen(image_bytes: bytes):
     img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
     ancho, alto = img.size
 
-    # Inferencia con modelo Keras si está cargado
+    # Inferencia con modelo Keras si está disponible
     if model is not None:
         try:
             img_redim = img.resize((150, 150))
@@ -53,55 +53,56 @@ def predecir_imagen(image_bytes: bytes):
             pass
 
     # --- ANÁLISIS EN LA COLUMNA NETA DEL LÍQUIDO ---
-    # Recorte estricto: evita dedos laterales (0.38 - 0.62) y fondo/boca de vidrio (0.28 - 0.72)
-    x1 = int(ancho * 0.38)
-    x2 = int(ancho * 0.62)
+    # Recorte central para aislar líquido de fondo y manos
+    x1 = int(ancho * 0.36)
+    x2 = int(ancho * 0.64)
     y1 = int(alto * 0.28)
-    y2 = int(alto * 0.72)
+    y2 = int(alto * 0.74)
 
     liquido = img.crop((x1, y1, x2, y2))
-    liquido_np = np.array(liquido.resize((50, 50)), dtype=np.float32)
+    liquido_np = np.array(liquido.resize((60, 60)), dtype=np.float32)
 
     px = liquido_np.reshape(-1, 3)
     brillos = np.mean(px, axis=1)
-    
-    # Filtrar fondos puros
+
+    # Filtrar fondos blancos o negros del lienzo
     validos = (brillos > 20) & (brillos < 240)
-    px_eval = px[validos] if np.sum(validos) > 25 else px
+    px_eval = px[validos] if np.sum(validos) > 30 else px
 
     r_mean = float(np.mean(px_eval[:, 0]))
     g_mean = float(np.mean(px_eval[:, 1]))
     b_mean = float(np.mean(px_eval[:, 2]))
-    brillo_medio = float(np.mean(brillos))
+    brillo_medio = float(np.mean(px_eval))
 
+    # Métricas fisicoquímicas
     deficit_azul = (r_mean + g_mean) / 2.0 - b_mean
     diferencia_rojo_azul = r_mean - b_mean
-    variacion = float(np.std(px_eval))
+    opacidad_oscura = max(0.0, 180.0 - brillo_medio)
+    variacion_textura = float(np.std(px_eval))
 
-    # --- REGLAS CALIBRADAS SEGÚN LUMINOSIDAD ---
+    # Puntuación de sedimentos y lodo (escala compuesta)
+    score_lodo = max(deficit_azul, diferencia_rojo_azul) * 1.5 + (opacidad_oscura * 0.5)
 
-    # CASO 1: ALTA TURBIDEZ / CRÍTICA
-    # Debe ser genuinamente oscura o tener coloración fuerte a tierra/barro
-    if (deficit_azul > 24 or diferencia_rojo_azul > 24) or (brillo_medio < 115 and deficit_azul > 10):
-        p_crit = min(96.0, max(85.0, 80.0 + deficit_azul * 0.4))
+    # 1. CASO ALTA TURBIDEZ / CRÍTICA (Lodo, sedimentos densos, agua marrón u opaca)
+    if (score_lodo > 32) or (diferencia_rojo_azul > 14 and brillo_medio < 145) or (brillo_medio < 100 and deficit_azul > 6):
+        # Escala responsiva que escala hasta 98.2% con lodo denso
+        p_crit = min(98.2, max(92.0, 88.0 + (score_lodo * 0.2)))
         p_mod = round((100.0 - p_crit) * 0.7, 1)
         p_opt = round(100.0 - p_crit - p_mod, 1)
         diag = "Alta Turbidez / Crítica"
         conf = p_crit
 
-    # CASO 2: LEVEMENTE TÚRBIDA / PRECAUCIÓN
-    # Agua blanquecina, lechosa o translúcida con partículas (brillo intermedio/alto pero no cristalina)
-    elif (brillo_medio >= 120 and (deficit_azul > 5 or variacion > 12 or brillo_medio < 195)):
-        p_mod = min(91.0, max(78.0, 75.0 + variacion * 0.4))
-        p_crit = round((100.0 - p_mod) * 0.2, 1) # Mantiene crítico muy bajo (<5%)
+    # 2. CASO LEVEMENTE TÚRBIDA / PRECAUCIÓN (Agua lechosa, blanquecina, cloro o niebla sin color tierra)
+    elif (brillo_medio >= 120 and (deficit_azul > 4 or variacion_textura > 12 or brillo_medio < 205)):
+        p_mod = min(92.0, max(80.0, 75.0 + variacion_textura * 0.45))
+        p_crit = round((100.0 - p_mod) * 0.2, 1)
         p_opt = round(100.0 - p_mod - p_crit, 1)
         diag = "Levemente Túrbida / Precaución"
         conf = p_mod
 
-    # CASO 3: AGUA LIMPIA / ÓPTIMA
-    # Transparente, muy brillante y uniforme
+    # 3. CASO AGUA LIMPIA / ÓPTIMA (Cristalina, sin absorción selectiva)
     else:
-        p_opt = min(96.5, max(88.0, 92.0 - deficit_azul * 0.3))
+        p_opt = min(97.5, max(89.0, 94.0 - deficit_azul * 0.3))
         p_mod = round((100.0 - p_opt) * 0.75, 1)
         p_crit = round(100.0 - p_opt - p_mod, 1)
         diag = "Agua Limpia / Óptima"
