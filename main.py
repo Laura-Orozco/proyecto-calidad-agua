@@ -164,12 +164,14 @@ async def test_envio_thingspeak():
 async def clasificar_muestra(file: UploadFile = File(...)):
     try:
         contenido = await file.read()
-        diagnostico, confianza = predecir_imagen(contenido)
+        res = predecir_imagen(contenido)
         return {
             "status": "success",
-            "diagnostico": diagnostico,
-            "confianza": f"{confianza}%",
-            "modelo_fuente": "Kaggle Dataset CNN (turbidez_model.keras)"
+            "diagnostico": res["diagnostico"],
+            "confianza": f"{res['confianza']}%",
+            "latencia_ms": res["latencia_ms"],
+            "distribucion": res["distribucion"],
+            "modelo_fuente": "Edge Colorimetry & CNN Pipeline"
         }
     except Exception as e:
         print(f"[ERROR VISIÓN]: {str(e)}")
