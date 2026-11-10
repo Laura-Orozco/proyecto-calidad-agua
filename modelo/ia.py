@@ -63,36 +63,57 @@ def predecir_imagen(image_bytes: bytes):
         except Exception as e:
             print(f"[!] Fallback a análisis espectral: {e}")
 
-    # Análisis espectral por recorte central (óptimo para bajo consumo en Render)
-    margen_x = int(ancho * 0.25)
-    margen_y = int(alto * 0.25)
+    # --- ANÁLISIS DE COLORIMETRÍA Y ABSORCIÓN ESPECTRAL ---
+    # 1. Tomamos una muestra de la zona central donde está el contenido del vaso
+    margen_x = int(ancho * 0.30)
+    margen_y = int(alto * 0.30)
     centro = img.crop((margen_x, margen_y, ancho - margen_x, alto - margen_y))
-    centro_np = np.array(centro.resize((64, 64)), dtype=np.float32)
+    centro_np = np.array(centro.resize((80, 80)), dtype=np.float32)
 
-    r_mean = float(np.mean(centro_np[:, :, 0]))
-    g_mean = float(np.mean(centro_np[:, :, 1]))
-    b_mean = float(np.mean(centro_np[:, :, 2]))
+    # Aplanar píxeles para filtrar fondos blancos (>235) y fondos negros (<20)
+    pixels = centro_np.reshape(-1, 3)
+    brillo_pixel = np.mean(pixels, axis=1)
+    
+    # Máscara: descartar píxeles que sean fondo blanco o negro puro
+    mascara_muestra = (brillo_pixel > 25) & (brillo_pixel < 235)
+    
+    if np.sum(mascara_muestra) > 50:
+        pixels_muestra = pixels[mascara_muestra]
+    else:
+        pixels_muestra = pixels # Si no hay suficiente contraste, usar todo
 
+    r = pixels_muestra[:, 0]
+    g = pixels_muestra[:, 1]
+    b = pixels_muestra[:, 2]
+
+    r_mean = float(np.mean(r))
+    g_mean = float(np.mean(g))
+    b_mean = float(np.mean(b))
+
+    # Absorción de la longitud de onda azul (los sedimentos, tierra y lodo absorben azul intensamente)
     deficit_azul = (r_mean + g_mean) / 2.0 - b_mean
-    brillo_centro = (r_mean + g_mean + b_mean) / 3.0
-    textura = float(np.std(centro_np))
+    diferencia_rojo_azul = r_mean - b_mean
+    brillo_promedio = float(np.mean(pixels_muestra))
 
-    # Distribución heurística Softmax según opacidad y absorción
-    if deficit_azul > 28 or (brillo_centro < 115 and deficit_azul > 12):
-        p_crit = min(96.0, max(84.0, 78.0 + (deficit_azul * 0.4)))
-        p_mod = round((100.0 - p_crit) * 0.72, 1)
+    # 2. Lógica de clasificación
+    # Agua con tierra/lodo/sedimento marrón visible: R claramente superior a B o fuerte déficit azul
+    if deficit_azul > 14 or diferencia_rojo_azul > 15 or (brillo_promedio < 130 and deficit_azul > 8):
+        p_crit = min(98.5, max(88.0, 82.0 + (deficit_azul * 0.5)))
+        p_mod = round((100.0 - p_crit) * 0.65, 1)
         p_opt = round(100.0 - p_crit - p_mod, 1)
         diag = "Alta Turbidez / Crítica"
         conf = p_crit
-    elif deficit_azul > 12 or (textura > 42 and brillo_centro < 170):
-        p_mod = min(92.0, max(79.0, 72.0 + (deficit_azul * 0.55)))
-        p_crit = round((100.0 - p_mod) * 0.45, 1)
+    # Turbidez moderada / verdosa / leve opacidad
+    elif deficit_azul > 6 or brillo_promedio < 170:
+        p_mod = min(91.0, max(76.0, 70.0 + (deficit_azul * 0.8)))
+        p_crit = round((100.0 - p_mod) * 0.4, 1)
         p_opt = round(100.0 - p_mod - p_crit, 1)
         diag = "Levemente Túrbida / Precaución"
         conf = p_mod
+    # Agua limpia / transparente (canales RGB equilibrados)
     else:
-        p_opt = min(97.5, max(86.0, 93.0 - (deficit_azul * 0.3)))
-        p_mod = round((100.0 - p_opt) * 0.8, 1)
+        p_opt = min(97.5, max(88.0, 94.0 - (deficit_azul * 0.4)))
+        p_mod = round((100.0 - p_opt) * 0.75, 1)
         p_crit = round(100.0 - p_opt - p_mod, 1)
         diag = "Agua Limpia / Óptima"
         conf = p_opt
