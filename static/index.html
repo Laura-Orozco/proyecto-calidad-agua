@@ -618,6 +618,121 @@
       color: var(--text-muted);
       border-top: 1px solid var(--border-card);
     }
+    /* Contenedor principal de la tarjeta de IA */
+.ai-agent-container {
+  background: linear-gradient(145deg, #ffffff, #f8fafc);
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.05), 0 8px 10px -6px rgba(15, 23, 42, 0.02);
+  margin-bottom: 28px;
+  transition: all 0.3s ease;
+}
+
+.ai-agent-header {
+  padding: 16px 20px;
+  background: linear-gradient(90deg, #1e3a8a, #2563eb);
+  color: #ffffff;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ai-agent-profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ai-agent-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.ai-agent-status-dot {
+  width: 8px;
+  height: 8px;
+  background-color: #22c55e;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.3);
+}
+
+.ai-iframe-wrapper {
+  position: relative;
+  width: 100%;
+  height: 520px;
+  background: #f1f5f9;
+}
+
+.ai-iframe-wrapper iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+/* Botón flotante estilizado con efecto pulso */
+.btn-floating-agent {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: #ffffff;
+  border: none;
+  border-radius: 50px;
+  padding: 12px 22px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  box-shadow: 0 10px 20px rgba(37, 99, 235, 0.35);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 1000;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.btn-floating-agent:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 24px rgba(37, 99, 235, 0.45);
+}
+
+/* Ventana emergente (Popup modal) */
+.chat-popup-window {
+  display: none;
+  position: fixed;
+  bottom: 86px;
+  right: 24px;
+  width: 390px;
+  height: 530px;
+  background-color: #ffffff;
+  border-radius: 18px;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  box-shadow: 0 20px 35px -5px rgba(15, 23, 42, 0.2);
+  z-index: 1000;
+  overflow: hidden;
+  flex-direction: column;
+  animation: popupSlide 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes popupSlide {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
   </style>
 </head>
 <body>
@@ -874,12 +989,60 @@
   <script src="/static/dashboard.js"></script>
 
   <!-- Script: Toggle del Chat Flotante -->
-  <script>
-    function toggleChatPopup() {
-      const popup = document.getElementById("chatModalPopup");
-      popup.style.display = (popup.style.display === "none" || popup.style.display === "") ? "flex" : "none";
-    }
-  </script>
+<!-- 4. Asistente Conversacional Inteligente (Rediseñado) -->
+    <section>
+      <div class="section-header">
+        <h2 class="section-title">Asistente Conversacional Experto en Calidad del Agua</h2>
+      </div>
+
+      <div class="ai-agent-container">
+        <div class="ai-agent-header">
+          <div class="ai-agent-profile">
+            <div class="ai-agent-avatar">🤖</div>
+            <div>
+              <div style="font-weight: 700; font-size: 0.98rem; display: flex; align-items: center; gap: 8px;">
+                <span>Agente Especialista IoT</span>
+                <span class="ai-agent-status-dot" title="Operativo"></span>
+              </div>
+              <p style="font-size: 0.78rem; opacity: 0.9; margin-top: 1px;">
+                Análisis en línea de turbidez, temperatura y normativas
+              </p>
+            </div>
+          </div>
+          <a href="https://backend-iot-vision.onrender.com/chat-gui" target="_blank" rel="noopener" class="btn" style="background: rgba(255,255,255,0.18); color: #fff; border: 1px solid rgba(255,255,255,0.3); font-size: 0.75rem;">
+            ↗ Abrir en pestaña nueva
+          </a>
+        </div>
+
+        <div class="ai-iframe-wrapper">
+          <iframe 
+            src="https://backend-iot-vision.onrender.com/chat-gui" 
+            title="Chatbot de Calidad del Agua">
+          </iframe>
+        </div>
+      </div>
+    </section>
+
+    <!-- Botón Flotante Rediseñado -->
+    <button id="btnOpenChat" class="btn-floating-agent" onclick="toggleChatPopup()">
+      <span style="font-size: 1.1rem;">💬</span>
+      <span>Consultar Agente IA</span>
+    </button>
+
+    <!-- Ventana Flotante Emergente Rediseñada -->
+    <div id="chatModalPopup" class="chat-popup-window">
+      <div style="background: linear-gradient(90deg, #1e3a8a, #2563eb); color: #ffffff; padding: 12px 18px; display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 1.1rem;">🤖</span>
+          <div>
+            <div style="font-weight: 700; font-size: 0.88rem;">Agente Calidad del Agua</div>
+            <div style="font-size: 0.7rem; opacity: 0.85;">En línea • Respuestas en tiempo real</div>
+          </div>
+        </div>
+        <button onclick="toggleChatPopup()" style="background: transparent; border: none; color: #ffffff; font-size: 1.2rem; cursor: pointer; line-height: 1; padding: 4px;">✕</button>
+      </div>
+      <iframe src="https://backend-iot-vision.onrender.com/chat-gui" style="width: 100%; height: 100%; border: none;"></iframe>
+    </div>
 
   <!-- Script: Captura de Cámara y Clasificación Visual -->
   <script>
