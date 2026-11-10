@@ -20,7 +20,7 @@ except Exception:
         model = tf.keras.models.load_model(MODEL_PATH)
         print(f"[*] Modelo TensorFlow cargado: {MODEL_PATH}")
     except Exception:
-        print("[*] Ejecutando análisis de visión por espectrometría y colorimetría digital")
+        print("[*] Ejecutando análisis espectral y detección de sedimentación")
 
 NOMBRES_LEGIBLES = {
     "limpa": "Agua Limpia / Óptima",
@@ -33,7 +33,7 @@ def predecir_imagen(image_bytes: bytes):
     img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
     ancho, alto = img.size
 
-    # Si Keras está presente en memoria
+    # Inferencia Keras si está disponible
     if model is not None:
         try:
             img_redim = img.resize((150, 150))
@@ -63,56 +63,65 @@ def predecir_imagen(image_bytes: bytes):
         except Exception as e:
             print(f"[!] Fallback a análisis espectral: {e}")
 
-    # --- ANÁLISIS DE COLORIMETRÍA Y ABSORCIÓN ESPECTRAL ---
-    # 1. Tomamos una muestra de la zona central donde está el contenido del vaso
-    margen_x = int(ancho * 0.30)
-    margen_y = int(alto * 0.30)
-    centro = img.crop((margen_x, margen_y, ancho - margen_x, alto - margen_y))
-    centro_np = np.array(centro.resize((80, 80)), dtype=np.float32)
+    # --- ANÁLISIS DE SEDIMENTACIÓN Y OPACIDAD VERTICAL ---
+    # Tomar la columna vertical central (del 20% al 85% de la altura para ver el fondo del vaso)
+    x1 = int(ancho * 0.30)
+    x2 = int(ancho * 0.70)
+    y1 = int(alto * 0.20)
+    y2 = int(alto * 0.88)  # Baja hasta el fondo real del vaso
 
-    # Aplanar píxeles para filtrar fondos blancos (>235) y fondos negros (<20)
-    pixels = centro_np.reshape(-1, 3)
-    brillo_pixel = np.mean(pixels, axis=1)
-    
-    # Máscara: descartar píxeles que sean fondo blanco o negro puro
-    mascara_muestra = (brillo_pixel > 25) & (brillo_pixel < 235)
-    
-    if np.sum(mascara_muestra) > 50:
-        pixels_muestra = pixels[mascara_muestra]
-    else:
-        pixels_muestra = pixels # Si no hay suficiente contraste, usar todo
+    vaso = img.crop((x1, y1, x2, y2))
+    vaso_np = np.array(vaso.resize((60, 100)), dtype=np.float32)
 
-    r = pixels_muestra[:, 0]
-    g = pixels_muestra[:, 1]
-    b = pixels_muestra[:, 2]
+    # Dividir el vaso en dos zonas: mitad superior y fondo (sedimentos)
+    mitad_arriba = vaso_np[:50, :, :]
+    mitad_abajo = vaso_np[50:, :, :]
 
-    r_mean = float(np.mean(r))
-    g_mean = float(np.mean(g))
-    b_mean = float(np.mean(b))
+    # Filtrar fondos blancos (>240) y negros (<15) para evaluar solo el líquido
+    def limpiar_zona(zona):
+        px = zona.reshape(-1, 3)
+        brillos = np.mean(px, axis=1)
+        validos = (brillos > 20) & (brillos < 235)
+        return px[validos] if np.sum(validos) > 20 else px
 
-    # Absorción de la longitud de onda azul (los sedimentos, tierra y lodo absorben azul intensamente)
+    px_arriba = limpiar_zona(mitad_arriba)
+    px_abajo = limpiar_zona(mitad_abajo)
+
+    brillo_arriba = float(np.mean(px_arriba))
+    brillo_abajo = float(np.mean(px_abajo))
+
+    r_mean = float(np.mean(px_abajo[:, 0]))
+    g_mean = float(np.mean(px_abajo[:, 1]))
+    b_mean = float(np.mean(px_abajo[:, 2]))
+
+    # Índices fisicoquímicos
     deficit_azul = (r_mean + g_mean) / 2.0 - b_mean
     diferencia_rojo_azul = r_mean - b_mean
-    brillo_promedio = float(np.mean(pixels_muestra))
+    caida_brillo_fondo = brillo_arriba - brillo_abajo  # Sedimento oscuro en la base
+    varianza_fondo = float(np.std(px_abajo))            # Suciedad heterogénea
 
-    # 2. Lógica de clasificación
-    # Agua con tierra/lodo/sedimento marrón visible: R claramente superior a B o fuerte déficit azul
-    if deficit_azul > 14 or diferencia_rojo_azul > 15 or (brillo_promedio < 130 and deficit_azul > 8):
-        p_crit = min(98.5, max(88.0, 82.0 + (deficit_azul * 0.5)))
-        p_mod = round((100.0 - p_crit) * 0.65, 1)
+    # 1. Caso Alta Turbidez / Sedimentos Críticos:
+    # Agua con barro uniforme O agua con capa espesa de sedimentos asentados abajo
+    if (deficit_azul > 14 or diferencia_rojo_azul > 14 or 
+        caida_brillo_fondo > 32 or (brillo_abajo < 110 and varianza_fondo > 25)):
+        
+        p_crit = min(96.5, max(86.0, 80.0 + max(deficit_azul, caida_brillo_fondo * 0.35)))
+        p_mod = round((100.0 - p_crit) * 0.7, 1)
         p_opt = round(100.0 - p_crit - p_mod, 1)
         diag = "Alta Turbidez / Crítica"
         conf = p_crit
-    # Turbidez moderada / verdosa / leve opacidad
-    elif deficit_azul > 6 or brillo_promedio < 170:
-        p_mod = min(91.0, max(76.0, 70.0 + (deficit_azul * 0.8)))
-        p_crit = round((100.0 - p_mod) * 0.4, 1)
+
+    # 2. Caso Levemente Túrbida / Partículas en suspensión:
+    elif deficit_azul > 6 or caida_brillo_fondo > 15 or varianza_fondo > 30:
+        p_mod = min(91.0, max(75.0, 72.0 + deficit_azul * 0.7))
+        p_crit = round((100.0 - p_mod) * 0.45, 1)
         p_opt = round(100.0 - p_mod - p_crit, 1)
         diag = "Levemente Túrbida / Precaución"
         conf = p_mod
-    # Agua limpia / transparente (canales RGB equilibrados)
+
+    # 3. Caso Óptima / Cristalina real (uniforme y sin caída de brillo al fondo):
     else:
-        p_opt = min(97.5, max(88.0, 94.0 - (deficit_azul * 0.4)))
+        p_opt = min(97.0, max(88.0, 93.0 - (deficit_azul * 0.3)))
         p_mod = round((100.0 - p_opt) * 0.75, 1)
         p_crit = round(100.0 - p_opt - p_mod, 1)
         diag = "Agua Limpia / Óptima"
@@ -125,8 +134,8 @@ def predecir_imagen(image_bytes: bytes):
         "confianza": round(conf, 1),
         "latencia_ms": latencia_ms,
         "distribucion": {
-            "optima": p_opt,
-            "moderada": p_mod,
-            "critica": p_crit
+            "optima": round(p_opt, 1),
+            "moderada": round(p_mod, 1),
+            "critica": round(p_crit, 1)
         }
     }
