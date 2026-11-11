@@ -244,7 +244,6 @@ async function ejecutarAnalisisManualML() {
   await enviarInferenciaML(temp, turb);
 }
 
-// 3. Envía los datos al endpoint de FastAPI y maqueta el resultado en la tarjeta
 async function enviarInferenciaML(temperatura, turbidez) {
   const resultBox = document.getElementById("ml-resultado-box");
   const txtResultado = document.getElementById("ml-resultado-texto");
@@ -255,12 +254,11 @@ async function enviarInferenciaML(temperatura, turbidez) {
 
   if (!resultBox) return;
 
-  resultBox.classList.remove("d-none");
-  if (txtResultado) txtResultado.innerText = "Analizando con Random Forest...";
-  if (barraProgreso) {
-    barraProgreso.className = "progress-bar progress-bar-striped progress-bar-animated bg-primary";
-    barraProgreso.style.width = "40%";
-  }
+  resultBox.style.display = "block";
+  txtResultado.style.color = "#1677B8";
+  txtResultado.innerText = "Analizando con Random Forest...";
+  barraProgreso.style.width = "40%";
+  barraProgreso.style.background = "#1677B8";
 
   try {
     const response = await fetch("/api/ml/predecir-potabilidad", {
@@ -281,39 +279,33 @@ async function enviarInferenciaML(temperatura, turbidez) {
 
       if (esPotable) {
         resultBox.style.backgroundColor = "#ECFDF5";
-        resultBox.style.border = "1px solid #A7F3D0";
-        if (txtResultado) {
-          txtResultado.style.color = "#065F46";
-          txtResultado.innerHTML = "💧 AGUA POTABLE";
-        }
-        if (badgeConfianza) badgeConfianza.className = "badge bg-success";
-        if (barraProgreso) barraProgreso.className = "progress-bar bg-success";
+        resultBox.style.borderColor = "#A7F3D0";
+        txtResultado.style.color = "#065F46";
+        txtResultado.innerHTML = "💧 AGUA POTABLE";
+        badgeConfianza.style.background = "#10B981";
+        badgeConfianza.style.color = "#ffffff";
+        barraProgreso.style.background = "#10B981";
       } else {
         resultBox.style.backgroundColor = "#FEF2F2";
-        resultBox.style.border = "1px solid #FECACA";
-        if (txtResultado) {
-          txtResultado.style.color = "#991B1B";
-          txtResultado.innerHTML = "⚠️ AGUA CONTAMINADA";
-        }
-        if (badgeConfianza) badgeConfianza.className = "badge bg-danger";
-        if (barraProgreso) barraProgreso.className = "progress-bar bg-danger";
+        resultBox.style.borderColor = "#FECACA";
+        txtResultado.style.color = "#991B1B";
+        txtResultado.innerHTML = "⚠️ AGUA CONTAMINADA";
+        badgeConfianza.style.background = "#EF4444";
+        badgeConfianza.style.color = "#ffffff";
+        barraProgreso.style.background = "#EF4444";
       }
 
-      if (badgeConfianza) badgeConfianza.innerText = `${confianza}% certeza`;
-      if (barraProgreso) barraProgreso.style.width = `${confianza}%`;
-      if (detalleTecnico) {
-        detalleTecnico.innerText = `Evaluado con Temp: ${temperatura} °C | Turbidez: ${turbidez} NTU`;
-      }
+      badgeConfianza.innerText = `${confianza}% certeza`;
+      barraProgreso.style.width = `${confianza}%`;
+      detalleTecnico.innerText = `Evaluado con Temp: ${temperatura} °C | Turbidez: ${turbidez} NTU`;
     } else {
       throw new Error(data.detail || "Error en la predicción");
     }
   } catch (error) {
     resultBox.style.backgroundColor = "#FFFBEB";
-    resultBox.style.border = "1px solid #FDE68A";
-    if (txtResultado) {
-      txtResultado.style.color = "#92400E";
-      txtResultado.innerText = "Error en evaluación";
-    }
-    if (detalleTecnico) detalleTecnico.innerText = error.message;
+    resultBox.style.borderColor = "#FDE68A";
+    txtResultado.style.color = "#92400E";
+    txtResultado.innerText = "Error en evaluación";
+    detalleTecnico.innerText = error.message;
   }
 }
