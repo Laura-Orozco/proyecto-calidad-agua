@@ -3,388 +3,304 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sistema de Monitoreo de Calidad del Agua | IoT & ML</title>
-
-  <!-- Fuente Inter -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-
-  <!-- Plotly.js para gráficos tipo dona, tacómetro y matriz de confusión -->
-  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
-
+  <title>Plataforma IoT & IA - Calidad del Agua</title>
+  
+  <!-- Bootstrap 5 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+  
   <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
     body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background-color: #F4F7FB;
-      color: #243447;
-      padding: 24px;
-      line-height: 1.5;
+      background-color: #f0f2f5;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
-
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
+    .navbar-custom {
+      background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
     }
-
-    /* Encabezado principal */
-    header.dashboard-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 24px;
-      background: #FFFFFF;
-      padding: 20px 24px;
-      border-radius: 14px;
-      border: 1px solid #E2E8F0;
-    }
-
-    header.dashboard-header h1 {
-      font-size: 22px;
-      font-weight: 800;
-      color: #102A43;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .badge-status {
-      background-color: #145C4B;
-      color: #D1FAE5;
-      padding: 6px 14px;
-      border-radius: 8px;
-      font-weight: 600;
-      font-size: 12px;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    /* Tarjetas generales */
-    .card {
-      background: #FFFFFF;
-      border: 1px solid #E2E8F0;
-      border-radius: 14px;
-      padding: 22px;
-      margin-bottom: 22px;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
-    }
-
-    .card h3, .card h4 {
-      color: #102A43;
-      font-weight: 700;
-      margin-bottom: 12px;
-    }
-
-    /* Cuadrícula de métricas en vivo */
-    .metrics-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 16px;
-      margin-bottom: 22px;
-    }
-
-    .metric-box {
-      background: #FFFFFF;
-      border: 1px solid #E2E8F0;
+    .card-metric {
+      border: none;
       border-radius: 12px;
-      padding: 16px;
-      text-align: center;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
-
-    .metric-label {
-      font-size: 12px;
-      color: #64748B;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
+    .card-metric:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 16px rgba(0,0,0,0.1);
     }
-
     .metric-value {
-      font-size: 26px;
-      font-weight: 800;
-      color: #102A43;
-      margin-top: 6px;
+      font-size: 2.2rem;
+      font-weight: 700;
     }
-
-    /* Pestañas del módulo ML */
-    .tab-btn {
-      background: #E8EEF5;
-      color: #243447;
-      border: none;
-      padding: 8px 16px;
-      border-radius: 8px;
-      font-weight: 600;
-      font-size: 12px;
-      cursor: pointer;
-      transition: background 0.2s ease, color 0.2s ease;
-    }
-
-    .tab-btn.active {
-      background: #1677B8;
-      color: #FFFFFF;
-    }
-
-    /* Botones de acción */
-    .btn-primary {
-      background: #1677B8;
-      color: #FFFFFF;
-      border: none;
-      border-radius: 9px;
-      padding: 12px 18px;
-      font-weight: 600;
-      font-size: 13px;
-      cursor: pointer;
-      display: inline-flex;
+    .video-container {
+      position: relative;
+      background: #000;
+      border-radius: 12px;
+      overflow: hidden;
+      min-height: 280px;
+      display: flex;
       align-items: center;
       justify-content: center;
-      gap: 8px;
+    }
+    #camera-feed {
       width: 100%;
-      transition: background 0.2s ease;
+      height: 100%;
+      object-fit: cover;
     }
-
-    .btn-primary:hover {
-      background: #105F96;
-    }
-
-    .btn-dark {
-      background: #102A43;
-      color: #FFFFFF;
-      border: none;
-      border-radius: 9px;
-      padding: 10px 18px;
-      font-weight: 600;
-      font-size: 13px;
-      cursor: pointer;
-      width: 100%;
-      transition: background 0.2s ease;
-    }
-
-    .btn-dark:hover {
-      background: #1E4565;
-    }
-
-    /* Formularios */
-    .form-input {
-      width: 100%;
-      padding: 10px;
-      border: 1px solid #CBD5E1;
-      border-radius: 8px;
-      font-size: 13px;
-      color: #102A43;
-      background: #F8FAFC;
-      outline: none;
-    }
-
-    .form-input:focus {
-      border-color: #1677B8;
-      background: #FFFFFF;
-    }
-
-    /* Tabla histórica */
-    table.data-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-      text-align: left;
-    }
-
-    table.data-table th {
-      background: #F8FAFC;
-      color: #64748B;
-      font-weight: 600;
-      padding: 12px;
-      border-bottom: 1px solid #E2E8F0;
-    }
-
-    table.data-table td {
-      padding: 12px;
-      border-bottom: 1px solid #E2E8F0;
-      color: #102A43;
+    .badge-status {
+      font-size: 0.85rem;
+      padding: 6px 12px;
+      border-radius: 20px;
     }
   </style>
 </head>
 <body>
 
-  <div class="container">
+  <!-- Barra de Navegación -->
+  <nav class="navbar navbar-dark navbar-custom shadow-sm mb-4">
+    <div class="container-fluid px-4">
+      <span class="navbar-brand mb-0 h1 d-flex align-items-center gap-2">
+        <i class="bi bi-droplet-half"></i> Calidad del Agua | IoT & Visión Artificial
+      </span>
+      <div class="d-flex align-items-center gap-3">
+        <span class="badge bg-success badge-status" id="system-status">
+          <i class="bi bi-broadcast"></i> Conectado
+        </span>
+        <span class="text-white small" id="metric-timestamp">Sincronizando...</span>
+      </div>
+    </div>
+  </nav>
 
-    <!-- ENCABEZADO -->
-    <header class="dashboard-header">
-      <div>
-        <h1>💧 Sistema de Calidad del Agua</h1>
-        <p style="color: #64748B; font-size: 13px; margin-top: 4px;">
-          📍 Barranquilla, Colombia | Monitoreo IoT & Machine Learning
-        </p>
+  <div class="container-fluid px-4">
+    
+    <!-- Fila 1: Métricas de Telemetría en Vivo -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-3">
+        <div class="card card-metric shadow-sm p-3 bg-white">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <h6 class="text-muted fw-normal mb-1">Temperatura</h6>
+              <div class="metric-value text-primary" id="metric-temperatura">-- °C</div>
+            </div>
+            <i class="bi bi-thermometer-half fs-1 text-primary opacity-50"></i>
+          </div>
+          <small class="text-muted">Sensor DS18B20</small>
+        </div>
       </div>
-      <div class="badge-status">
-        ● NODO ACTIVO: calidad_agua
-      </div>
-    </header>
 
-    <!-- TELEMETRÍA EN TIEMPO REAL -->
-    <div class="metrics-grid">
-      <div class="metric-box">
-        <div class="metric-label">Temperatura</div>
-        <div class="metric-value" id="metric-temperatura">-- °C</div>
+      <div class="col-md-3">
+        <div class="card card-metric shadow-sm p-3 bg-white">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <h6 class="text-muted fw-normal mb-1">Turbidez</h6>
+              <div class="metric-value text-info" id="metric-turbidez">-- NTU</div>
+            </div>
+            <i class="bi bi-water fs-1 text-info opacity-50"></i>
+          </div>
+          <small class="text-muted">Sensor Óptico</small>
+        </div>
       </div>
-      <div class="metric-box">
-        <div class="metric-label">Turbidez</div>
-        <div class="metric-value" id="metric-turbidez">-- NTU</div>
+
+      <div class="col-md-3">
+        <div class="card card-metric shadow-sm p-3 bg-white">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <h6 class="text-muted fw-normal mb-1">Estado Físico</h6>
+              <div class="metric-value text-success fs-3 mt-1" id="metric-estado">Normal</div>
+            </div>
+            <i class="bi bi-check-circle-fill fs-1 text-success opacity-50"></i>
+          </div>
+          <small class="text-muted">Umbral de Calidad</small>
+        </div>
       </div>
-      <div class="metric-box">
-        <div class="metric-label">Estado de Red</div>
-        <div class="metric-value" id="metric-estado" style="font-size: 18px; color: #0D9488; margin-top: 12px;">Conectado</div>
-      </div>
-      <div class="metric-box">
-        <div class="metric-label">Última Sincronización</div>
-        <div class="metric-value" id="metric-timestamp" style="font-size: 16px; margin-top: 14px; font-weight: 600;">--:--:--</div>
+
+      <div class="col-md-3">
+        <div class="card card-metric shadow-sm p-3 bg-white">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <h6 class="text-muted fw-normal mb-1">Identificador Nodo</h6>
+              <div class="metric-value text-dark fs-3 mt-1" id="metric-nodo">calidad_agua</div>
+            </div>
+            <i class="bi bi-cpu fs-1 text-secondary opacity-50"></i>
+          </div>
+          <small class="text-muted">Microcontrolador ESP32</small>
+        </div>
       </div>
     </div>
 
-    <!-- ========================================================== -->
-    <!-- MÓDULO MACHINE LEARNING (SUSTITUTO DE EDGE IMPULSE)        -->
-    <!-- ========================================================== -->
-    <div class="card">
-      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; border-bottom: 1px solid #E2E8F0; padding-bottom: 14px;">
-        <div>
-          <h3 style="margin: 0; font-size: 18px;">💧 Diagnóstico Predictivo H2O (Random Forest)</h3>
-          <span style="color: #64748B; font-size: 12px;">Correlación en tiempo real: Temperatura y Turbidez</span>
-        </div>
-        <div style="display: flex; gap: 8px;">
-          <button type="button" class="tab-btn active" id="tab-btn-resumen" onclick="cambiarVistaH2O('resumen')">
-            Resumen
-          </button>
-          <button type="button" class="tab-btn" id="tab-btn-simulador" onclick="cambiarVistaH2O('simulador')">
-            Simulador
-          </button>
-          <button type="button" class="tab-btn" id="tab-btn-matriz" onclick="cambiarVistaH2O('matriz')">
-            Matriz
-          </button>
-        </div>
-      </div>
-
-      <!-- VISTA 1: DONUTS DE KEVIN -->
-      <div id="vista-h2o-resumen">
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px;">
-          <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 12px; text-align: center;">
-            <div id="donut-accuracy" style="height: 190px;"></div>
-            <span style="font-size: 11px; color: #64748B; font-weight: 600;">Precisión del Modelo</span>
+    <!-- Fila 2: Edge Impulse & Control Remoto IoT -->
+    <div class="row g-4 mb-4">
+      
+      <!-- SECCIÓN ORIGINAL: Edge Impulse Standalone WASM -->
+      <div class="col-lg-6">
+        <div class="card shadow-sm h-100 p-4 border-0 rounded-3">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="fw-bold mb-0">
+              <i class="bi bi-lightning-charge text-warning me-2"></i>Clasificación Edge Impulse (Edge AI)
+            </h5>
+            <span class="badge bg-light text-dark border" id="edge-model-status">WASM Standalone</span>
           </div>
-          <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 12px; text-align: center;">
-            <div id="donut-temp" style="height: 190px;"></div>
-            <span style="font-size: 11px; color: #64748B; font-weight: 600;">Temperatura (°C)</span>
-          </div>
-          <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 12px; text-align: center;">
-            <div id="donut-turb" style="height: 190px;"></div>
-            <span style="font-size: 11px; color: #64748B; font-weight: 600;">Turbidez (NTU)</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- VISTA 2: SIMULADOR CON GAUGE / TACÓMETRO -->
-      <div id="vista-h2o-simulador" style="display: none;">
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: center;">
-          <div>
-            <button type="button" class="btn-primary" onclick="analizarLecturaActualESP32()" style="margin-bottom: 14px;">
-              ⚡ Evaluar Último Dato del ESP32
-            </button>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
-              <div>
-                <label style="font-size: 11px; font-weight: 600; color: #243447; display: block; margin-bottom: 4px;">Temperatura (°C)</label>
-                <input type="number" step="0.1" id="input-temp-ml" class="form-input" placeholder="Ej: 24.5">
-              </div>
-              <div>
-                <label style="font-size: 11px; font-weight: 600; color: #243447; display: block; margin-bottom: 4px;">Turbidez (NTU)</label>
-                <input type="number" step="0.01" id="input-turb-ml" class="form-input" placeholder="Ej: 3.20">
-              </div>
-            </div>
-            <button type="button" class="btn-dark" onclick="ejecutarAnalisisManualML()">
-              Simular Manualmente
+          <p class="text-muted small">
+            Ejecución del modelo entrenado de Edge Impulse compilado en WebAssembly (.wasm) directamente sobre las variables sensoriales.
+          </p>
+          
+          <div class="d-grid gap-2 mb-3">
+            <button class="btn btn-outline-primary fw-semibold" id="btn-run-edge-impulse" onclick="ejecutarEdgeImpulse()">
+              <i class="bi bi-play-circle me-1"></i> Ejecutar Inferencia Edge Impulse
             </button>
           </div>
 
-          <div style="text-align: center;">
-            <div id="gauge-confianza" style="height: 200px;"></div>
-            <div id="ml-alerta-resultado" style="display: none; padding: 10px; border-radius: 8px; font-weight: 700; font-size: 13px; margin-top: 8px;"></div>
+          <div id="edge-impulse-result" class="p-3 bg-light rounded-3 d-none border">
+            <div class="d-flex justify-content-between mb-2">
+              <strong id="edge-prediccion-label">Clase: --</strong>
+              <span class="badge bg-primary" id="edge-confianza-badge">0%</span>
+            </div>
+            <div class="progress" style="height: 10px;">
+              <div id="edge-progreso-barra" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%;"></div>
+            </div>
+            <small class="text-muted mt-2 d-block" id="edge-tiempo-inferencia">Latencia de inferencia: -- ms</small>
           </div>
         </div>
       </div>
 
-      <!-- VISTA 3: HEATMAP MATRIZ DE CONFUSIÓN -->
-      <div id="vista-h2o-matriz" style="display: none;">
-        <div style="display: grid; grid-template-columns: 1.3fr 1fr; gap: 18px; align-items: center;">
-          <div id="heatmap-confusion" style="height: 270px;"></div>
-          <div style="display: flex; flex-direction: column; gap: 10px;">
-            <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px;">
-              <span style="font-size: 11px; color: #64748B;">Exactitud (Accuracy)</span>
-              <h4 id="metric-accuracy-val" style="margin: 2px 0 0 0; color: #102A43; font-size: 20px;">--%</h4>
+      <!-- Configuración y Control ESP32 -->
+      <div class="col-lg-6">
+        <div class="card shadow-sm h-100 p-4 border-0 rounded-3">
+          <h5 class="fw-bold mb-3">
+            <i class="bi bi-sliders text-primary me-2"></i>Control de Frecuencia y Parámetros
+          </h5>
+          <p class="text-muted small">
+            Ajuste el periodo de muestreo y transmisión del microcontrolador hacia la nube.
+          </p>
+
+          <div class="mb-3">
+            <label for="input-frecuencia" class="form-label small fw-semibold">Frecuencia de Envío (segundos)</label>
+            <div class="input-group">
+              <input type="number" class="form-control" id="input-frecuencia" value="15" min="1" max="3600">
+              <button class="btn btn-primary" type="button" onclick="actualizarFrecuenciaMuestreo()">
+                <i class="bi bi-arrow-repeat me-1"></i> Actualizar
+              </button>
             </div>
-            <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px;">
-              <span style="font-size: 11px; color: #64748B;">Precisión</span>
-              <h4 id="metric-precision-val" style="margin: 2px 0 0 0; color: #102A43; font-size: 20px;">--%</h4>
-            </div>
-            <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px;">
-              <span style="font-size: 11px; color: #64748B;">F1-Score</span>
-              <h4 id="metric-f1-val" style="margin: 2px 0 0 0; color: #102A43; font-size: 20px;">--%</h4>
+            <div class="form-text">Define cada cuántos segundos el ESP32 envía lecturas a Neon DB.</div>
+          </div>
+
+          <div class="border-top pt-3 mt-3">
+            <h6 class="fw-bold small text-muted text-uppercase mb-2">Simulación de Entrada de Teclado</h6>
+            <div class="d-flex gap-2">
+              <button class="btn btn-sm btn-outline-secondary" onclick="enviarTeclaSimulada('A')">Tecla A</button>
+              <button class="btn btn-sm btn-outline-secondary" onclick="enviarTeclaSimulada('B')">Tecla B</button>
+              <button class="btn btn-sm btn-outline-secondary" onclick="enviarTeclaSimulada('C')">Tecla C</button>
+              <button class="btn btn-sm btn-outline-secondary" onclick="enviarTeclaSimulada('*')">Tecla *</button>
+              <button class="btn btn-sm btn-outline-secondary" onclick="enviarTeclaSimulada('#')">Tecla #</button>
             </div>
           </div>
         </div>
       </div>
+
     </div>
 
-    <!-- MÓDULO DE INSPECCIÓN VISUAL (CNN / XAI) -->
-    <div class="card">
-      <h3>📷 Módulo de Inspección Visual e IA (Pipeline CNN)</h3>
-      <p style="color: #64748B; font-size: 13px; margin-bottom: 18px;">
-        Evaluación óptica de muestras líquidas mediante redes neuronales convolucionales.
-      </p>
+    <!-- Fila 3: Visión por Computadora (CNN XAI) & Asistente LLM -->
+    <div class="row g-4 mb-4">
+      
+      <!-- Cámara e Inspección Visual -->
+      <div class="col-lg-7">
+        <div class="card shadow-sm p-4 border-0 rounded-3">
+          <h5 class="fw-bold mb-3">
+            <i class="bi bi-camera-video text-danger me-2"></i>Inspección Visual y Grad-CAM XAI
+          </h5>
+          
+          <div class="video-container mb-3">
+            <video id="camera-feed" autoplay playsinline muted></video>
+            <canvas id="camera-canvas" class="d-none"></canvas>
+          </div>
 
-      <form id="form-vision" style="display: flex; gap: 12px; align-items: center; max-width: 550px;">
-        <input type="file" id="input-imagen-muestra" accept="image/*" class="form-input">
-        <button type="submit" class="btn-primary" style="width: auto; white-space: nowrap;">
-          Analizar Muestra
-        </button>
-      </form>
+          <div class="d-flex gap-2 mb-3">
+            <button class="btn btn-outline-secondary btn-sm" id="btn-toggle-cam" onclick="toggleCamara()">
+              <i class="bi bi-camera me-1"></i> Encender/Apagar Cámara
+            </button>
+            <button class="btn btn-danger btn-sm" onclick="capturarYClasificar()">
+              <i class="bi bi-upc-scan me-1"></i> Capturar Fotograma y Diagnosticar
+            </button>
+          </div>
 
-      <div id="vision-resultado-box" style="display: none; margin-top: 16px; padding: 14px; background: #F8FAFC; border-radius: 8px; border: 1px solid #E2E8F0;">
-        <p id="vision-diagnostico" style="font-weight: 700; color: #102A43; margin-bottom: 4px;"></p>
-        <p id="vision-confianza" style="font-size: 12px; color: #64748B;"></p>
+          <div class="mb-3">
+            <label class="form-label small text-muted">O cargar archivo de imagen para inferencia:</label>
+            <input type="file" class="form-control form-control-sm" id="input-imagen-muestra" accept="image/*" onchange="cargarImagenArchivo(event)">
+          </div>
+
+          <div id="vision-resultado-box" class="p-3 bg-light rounded-3 d-none border">
+            <h6 class="fw-bold text-dark mb-1" id="vision-diagnostico">Diagnóstico: --</h6>
+            <p class="text-muted small mb-0" id="vision-confianza">Confianza: -- | Latencia: -- ms</p>
+          </div>
+        </div>
       </div>
+
+      <!-- Asistente LLM y Consultas -->
+      <div class="col-lg-5">
+        <div class="card shadow-sm p-4 border-0 rounded-3 h-100 d-flex flex-column">
+          <h5 class="fw-bold mb-3">
+            <i class="bi bi-robot text-success me-2"></i>Asistente Inteligente Hídrico
+          </h5>
+          <p class="text-muted small">
+            Consulte interpretaciones automáticas sobre los parámetros fisicoquímicos del agua.
+          </p>
+
+          <div id="chat-box" class="flex-grow-1 p-3 bg-light rounded-3 mb-3 border overflow-auto" style="max-height: 220px; min-height: 140px;">
+            <div class="text-muted small fst-italic">El asistente está listo para resolver dudas sobre turbidez o temperatura.</div>
+          </div>
+
+          <div class="input-group">
+            <input type="text" class="form-control" id="chat-input" placeholder="Pregunta sobre los sensores...">
+            <button class="btn btn-success" type="button" onclick="enviarMensajeChat()">
+              <i class="bi bi-send"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
     </div>
 
-    <!-- HISTORIAL EN NEON DB -->
-    <div class="card">
-      <h3>Historial de Lecturas Recientes (Neon DB)</h3>
-      <div style="overflow-x: auto;">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Nodo</th>
-              <th>Temperatura</th>
-              <th>Turbidez</th>
-              <th>Estado</th>
-              <th>Marca Temporal</th>
-            </tr>
-          </thead>
-          <tbody id="tabla-historial-body">
-            <tr>
-              <td colspan="6" style="text-align: center; color: #94A3B8;">Cargando lecturas...</td>
-            </tr>
-          </tbody>
-        </table>
+    <!-- Fila 4: Historial de Lecturas Neon DB -->
+    <div class="row mb-4">
+      <div class="col-12">
+        <div class="card shadow-sm p-4 border-0 rounded-3">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="fw-bold mb-0">
+              <i class="bi bi-database text-primary me-2"></i>Registro Histórico de Telemetría (Neon DB)
+            </h5>
+            <button class="btn btn-sm btn-outline-primary" onclick="cargarHistorial()">
+              <i class="bi bi-arrow-clockwise me-1"></i> Refrescar
+            </button>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>ID</th>
+                  <th>Nodo</th>
+                  <th>Temperatura</th>
+                  <th>Turbidez</th>
+                  <th>Estado</th>
+                  <th>Fecha y Hora</th>
+                </tr>
+              </thead>
+              <tbody id="tabla-historial-body">
+                <tr>
+                  <td colspan="6" class="text-center text-muted">Cargando mediciones desde Neon DB...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
 
   </div>
 
-  <!-- SCRIPT DASHBOARD -->
+  <!-- Scripts: Edge Impulse Standalone, Bootstrap y Control Central -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="edge-impulse-standalone.js"></script>
+  <script src="run-impulse.js"></script>
   <script src="dashboard.js"></script>
 </body>
 </html>
