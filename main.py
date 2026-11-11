@@ -39,7 +39,9 @@ def get_db_connection():
 # --- MODELOS PYDANTIC ---
 
 class Esp32Datos(BaseModel):
-    device_id: Optional[str] = "calidad_agua"
+    # Acepta identificador o device_id por compatibilidad con el JSON del ESP32
+    identificador: Optional[str] = "calidad_agua"
+    device_id: Optional[str] = None
     temperatura: float
     turbidez: float
     estado: Optional[str] = "Normal"
@@ -72,17 +74,17 @@ def obtener_ultima_telemetria():
         if not fila:
             return {
                 "id": 0,
-                "device_id": "calidad_agua",
+                "identificador": "calidad_agua",
                 "temperatura": 24.5,
                 "turbidez": 3.0,
                 "estado": "Normal",
-                "fecha": None
+                "timestamp": None
             }
         return fila
     except Exception as e:
         return {
             "error": str(e),
-            "device_id": "calidad_agua",
+            "identificador": "calidad_agua",
             "temperatura": 24.5,
             "turbidez": 3.0,
             "estado": "Normal"
@@ -106,25 +108,26 @@ def obtener_calidad_agua(limit: int = 50):
 def recibir_datos_esp32(datos: Esp32Datos):
     """
     Endpoint receptor del microcontrolador ESP32.
-    Inserta la lectura asegurando device_id ('calidad_agua' por defecto) y marca de tiempo NOW().
+    Inserta la lectura en las columnas identificador y timestamp (NOW()).
     """
     try:
-        # Si Kevin no envía el identificador o llega en blanco, forzar 'calidad_agua'
-        dispositivo_nombre = datos.device_id.strip() if datos.device_id and datos.device_id.strip() else "calidad_agua"
+        # Resolver el nombre del nodo priorizando identificador, luego device_id o el valor por defecto
+        nombre = datos.identificador if datos.identificador and datos.identificador.strip() else datos.device_id
+        nodo = nombre.strip() if nombre and nombre.strip() else "calidad_agua"
 
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute(
             """
-            INSERT INTO lecturas_calidad_agua (device_id, temperatura, turbidez, estado, fecha)
+            INSERT INTO lecturas_calidad_agua (identificador, temperatura, turbidez, estado, timestamp)
             VALUES (%s, %s, %s, %s, NOW())
-            RETURNING id, fecha;
+            RETURNING id, timestamp;
             """,
-            (dispositivo_nombre, datos.temperatura, datos.turbidez, datos.estado)
+            (nodo, datos.temperatura, datos.turbidez, datos.estado)
         )
         resultado = cur.fetchone()
         nuevo_id = resultado["id"]
-        fecha_registro = resultado["fecha"]
+        ts_registro = resultado["timestamp"]
         conn.commit()
         cur.close()
         conn.close()
@@ -133,8 +136,8 @@ def recibir_datos_esp32(datos: Esp32Datos):
             "status": "success",
             "mensaje": "Lectura registrada con éxito",
             "id": nuevo_id,
-            "device_id": dispositivo_nombre,
-            "fecha": fecha_registro
+            "identificador": nodo,
+            "timestamp": ts_registro
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error guardando lectura ESP32: {str(e)}")
