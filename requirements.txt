@@ -5,3 +5,5 @@ numpy
 python-multipart
 pydantic
 psycopg2-binary
+scikit-learn
+pandas
