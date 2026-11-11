@@ -231,3 +231,10 @@ def predecir_agua(datos: EntradaML):
         return {"status": "success", **resultado}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+from modelo.ml_potabilidad import predecir_potabilidad, inicializar_modelo_potabilidad, obtener_metricas_modelo
+
+inicializar_modelo_potabilidad()
+
+@app.get("/api/ml/metricas", summary="Obtener Métricas y Matriz de Confusión")
+def get_ml_metrics():
+    return {"status": "success", "data": obtener_metricas_modelo()}
