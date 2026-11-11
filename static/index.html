@@ -520,53 +520,111 @@
       </div>
     </section>
 
-<!-- Módulo Machine Learning: Potabilidad -->
-<div class="card shadow-sm p-4 mb-4" style="border-radius: 12px; border: 1px solid #E2E8F0; background: #ffffff;">
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <h5 class="m-0 fw-bold" style="color: #102A43;">
-      <i class="bi bi-cpu-fill text-primary me-2"></i>Predicción de Potabilidad (Random Forest)
-    </h5>
-    <span class="badge bg-light text-secondary border" id="ml-accuracy-badge">Modelo listo</span>
-  </div>
-
-  <p class="text-muted small">
-    Clasificación hídrica en tiempo real correlacionando temperatura y turbidez.
-  </p>
-
-  <!-- Botón que jala el último dato de Neon DB -->
-  <button class="btn btn-primary w-100 mb-3 fw-semibold" id="btn-analizar-sensor" onclick="analizarLecturaActualESP32()">
-    ⚡ Evaluar con Última Lectura del ESP32
-  </button>
-
-  <!-- Inputs manuales -->
-  <div class="row g-2 mb-3">
-    <div class="col-6">
-      <label class="form-label small text-muted mb-1">Temperatura (°C)</label>
-      <input type="number" step="0.1" class="form-control form-control-sm" id="input-temp-ml" placeholder="Ej: 24.5">
+<!-- TARJETA MACHINE LEARNING: RANDOM FOREST / H2O -->
+<div style="background: #ffffff; border: 1px solid #E2E8F0; border-radius: 14px; padding: 22px; margin-bottom: 24px; box-shadow: 0 2px 4px rgba(0,0,0,0.03); font-family: 'Inter', system-ui, sans-serif;">
+  
+  <!-- Encabezado con selector de vistas -->
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 18px; border-bottom: 1px solid #E8EEF5; padding-bottom: 14px;">
+    <div>
+      <span style="font-size: 13px; font-weight: 800; color: #102A43; letter-spacing: 0.5px;">
+        💧 MODELO PREDICTIVO RANDOM FOREST (H2O)
+      </span>
+      <p style="margin: 2px 0 0 0; font-size: 12px; color: #64748B;">
+        Clasificación binaria en tiempo real (Agua Potable vs. Contaminada)
+      </p>
     </div>
-    <div class="col-6">
-      <label class="form-label small text-muted mb-1">Turbidez (NTU)</label>
-      <input type="number" step="0.01" class="form-control form-control-sm" id="input-turb-ml" placeholder="Ej: 3.20">
+
+    <!-- Botones de pestañas estilo píldora -->
+    <div style="display: flex; gap: 6px; background: #F1F5F9; padding: 4px; border-radius: 10px;">
+      <button type="button" id="tab-h2o-donuts" onclick="mostrarPestanaH2O('donuts')" style="background: #1677B8; color: #ffffff; border: none; padding: 6px 14px; border-radius: 7px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;">
+        Donas
+      </button>
+      <button type="button" id="tab-h2o-sim" onclick="mostrarPestanaH2O('sim')" style="background: transparent; color: #475569; border: none; padding: 6px 14px; border-radius: 7px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;">
+        Simulador
+      </button>
+      <button type="button" id="tab-h2o-matriz" onclick="mostrarPestanaH2O('matriz')" style="background: transparent; color: #475569; border: none; padding: 6px 14px; border-radius: 7px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;">
+        Matriz
+      </button>
     </div>
   </div>
 
-  <button class="btn btn-outline-secondary btn-sm w-100 mb-3" onclick="ejecutarAnalisisManualML()">
-    Simular Valores Manuales
-  </button>
-
-  <!-- Caja dinámica del resultado -->
-  <div id="ml-resultado-box" class="p-3 d-none" style="border-radius: 8px;">
-    <div class="d-flex justify-content-between align-items-center mb-2">
-      <span class="fw-bold fs-6" id="ml-resultado-texto"></span>
-      <span class="badge" id="ml-confianza-badge"></span>
+  <!-- VISTA 1: LAS 3 DONAS DE KEVIN -->
+  <div id="h2o-vista-donuts" style="display: block;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px;">
+      <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 10px; text-align: center;">
+        <div id="donut-accuracy" style="height: 180px;"></div>
+        <span style="font-size: 11px; color: #64748B; font-weight: 600; text-transform: uppercase;">Precisión del Modelo</span>
+      </div>
+      <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 10px; text-align: center;">
+        <div id="donut-temp" style="height: 180px;"></div>
+        <span style="font-size: 11px; color: #64748B; font-weight: 600; text-transform: uppercase;">Temperatura ESP32</span>
+      </div>
+      <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 10px; text-align: center;">
+        <div id="donut-turb" style="height: 180px;"></div>
+        <span style="font-size: 11px; color: #64748B; font-weight: 600; text-transform: uppercase;">Turbidez ESP32</span>
+      </div>
     </div>
-    <div class="progress" style="height: 8px; background-color: #E2E8F0;">
-      <div id="ml-progreso-barra" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%;"></div>
-    </div>
-    <small class="text-muted d-block mt-2" id="ml-detalle-tecnico"></small>
   </div>
+
+  <!-- VISTA 2: SIMULADOR CON TACÓMETRO (GAUGE) -->
+  <div id="h2o-vista-sim" style="display: none;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; align-items: center;">
+      <div>
+        <button type="button" onclick="analizarLecturaActualESP32()" style="width: 100%; background: #1677B8; color: #ffffff; border: none; border-radius: 8px; padding: 11px; font-weight: 600; font-size: 13px; cursor: pointer; margin-bottom: 14px; box-shadow: 0 2px 4px rgba(22,119,184,0.2);">
+          ⚡ Evaluar Último Dato del ESP32
+        </button>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+          <div>
+            <label style="display: block; font-size: 11px; font-weight: 700; color: #243447; margin-bottom: 4px;">Temperatura (°C)</label>
+            <input type="number" step="0.1" id="input-temp-ml" placeholder="Ej: 24.5" style="width: 100%; box-sizing: border-box; padding: 9px 12px; border: 1px solid #CBD5E1; border-radius: 8px; font-size: 13px; background: #F8FAFC;">
+          </div>
+          <div>
+            <label style="display: block; font-size: 11px; font-weight: 700; color: #243447; margin-bottom: 4px;">Turbidez (NTU)</label>
+            <input type="number" step="0.01" id="input-turb-ml" placeholder="Ej: 3.20" style="width: 100%; box-sizing: border-box; padding: 9px 12px; border: 1px solid #CBD5E1; border-radius: 8px; font-size: 13px; background: #F8FAFC;">
+          </div>
+        </div>
+
+        <button type="button" onclick="ejecutarAnalisisManualML()" style="width: 100%; background: #102A43; color: #ffffff; border: none; border-radius: 8px; padding: 10px; font-weight: 600; font-size: 12px; cursor: pointer;">
+          Simular Manualmente ➜
+        </button>
+      </div>
+
+      <div style="text-align: center; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 14px;">
+        <div id="gauge-confianza" style="height: 180px;"></div>
+        <div id="ml-alerta-resultado" style="display: none; padding: 10px; border-radius: 8px; font-weight: 700; font-size: 13px; margin-top: 6px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VISTA 3: HEATMAP MATRIZ DE CONFUSIÓN -->
+  <div id="h2o-vista-matriz" style="display: none;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; align-items: center;">
+      <div style="background: #ffffff; border: 1px solid #E2E8F0; border-radius: 10px; padding: 8px;">
+        <div id="heatmap-confusion" style="height: 240px;"></div>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+        <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px; text-align: center;">
+          <span style="font-size: 10px; color: #64748B; font-weight: 700; text-transform: uppercase;">Exactitud</span>
+          <div id="metric-accuracy-val" style="font-size: 20px; font-weight: 800; color: #102A43; margin-top: 4px;">--%</div>
+        </div>
+        <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px; text-align: center;">
+          <span style="font-size: 10px; color: #64748B; font-weight: 700; text-transform: uppercase;">Precisión</span>
+          <div id="metric-precision-val" style="font-size: 20px; font-weight: 800; color: #102A43; margin-top: 4px;">--%</div>
+        </div>
+        <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px; text-align: center;">
+          <span style="font-size: 10px; color: #64748B; font-weight: 700; text-transform: uppercase;">Recall</span>
+          <div id="metric-recall-val" style="font-size: 20px; font-weight: 800; color: #102A43; margin-top: 4px;">--%</div>
+        </div>
+        <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px; text-align: center;">
+          <span style="font-size: 10px; color: #64748B; font-weight: 700; text-transform: uppercase;">F1-Score</span>
+          <div id="metric-f1-val" style="font-size: 20px; font-weight: 800; color: #102A43; margin-top: 4px;">--%</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>
-
     <!-- 3. MÓDULO VISUAL E IA EXPLICABLE (GRAD-CAM XAI) -->
     <section>
       <div class="section-header">
