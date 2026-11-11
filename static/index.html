@@ -519,36 +519,52 @@
       </div>
     </section>
 
-    <!-- 2. Clasificación Edge Impulse (WASM) -->
-    <section>
-      <div class="section-header">
-        <h2 class="section-title">Módulo de Clasificación con Inteligencia Artificial (Edge Impulse)</h2>
-      </div>
+<!-- Módulo Machine Learning: Potabilidad -->
+<div class="card shadow-sm p-4 mb-4" style="border-radius: 12px; border: 1px solid #E2E8F0; background: #ffffff;">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="m-0 fw-bold" style="color: #102A43;">
+      <i class="bi bi-cpu-fill text-primary me-2"></i>Predicción de Potabilidad (Random Forest)
+    </h5>
+    <span class="badge bg-light text-secondary border" id="ml-accuracy-badge">Modelo listo</span>
+  </div>
 
-      <div class="card ml-card">
-        <div class="ml-layout">
-          <form id="formInferencia" onsubmit="event.preventDefault(); predecirMuestra();">
-            <div class="form-field">
-              <label for="inputTurb">Turbidez (NTU):</label>
-              <input type="number" step="any" id="inputTurb" placeholder="Ejemplo: 12.5" required>
-            </div>
-            <div class="form-field">
-              <label for="inputTemp">Temperatura (°C):</label>
-              <input type="number" step="any" id="inputTemp" placeholder="Ejemplo: 24.5" required>
-            </div>
-            <button type="submit" class="btn btn-primary" id="btn-evaluar" style="width: 100%; margin-top: 6px;">
-              Evaluar Parámetros
-            </button>
-          </form>
+  <p class="text-muted small">
+    Clasificación hídrica en tiempo real correlacionando temperatura y turbidez.
+  </p>
 
-          <div class="result-display">
-            <span style="font-size: 0.78rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Diagnóstico WASM</span>
-            <div id="resultadoEtiqueta" style="font-size: 1.35rem; font-weight: 700; margin: 10px 0; color: var(--text-title);">Cargando modelo...</div>
-            <span id="resultadoConfianza" style="font-size: 0.84rem; color: var(--text-muted);">Inicializando motor de inferencia</span>
-          </div>
-        </div>
-      </div>
-    </section>
+  <!-- Botón que jala el último dato de Neon DB -->
+  <button class="btn btn-primary w-100 mb-3 fw-semibold" id="btn-analizar-sensor" onclick="analizarLecturaActualESP32()">
+    ⚡ Evaluar con Última Lectura del ESP32
+  </button>
+
+  <!-- Inputs manuales -->
+  <div class="row g-2 mb-3">
+    <div class="col-6">
+      <label class="form-label small text-muted mb-1">Temperatura (°C)</label>
+      <input type="number" step="0.1" class="form-control form-control-sm" id="input-temp-ml" placeholder="Ej: 24.5">
+    </div>
+    <div class="col-6">
+      <label class="form-label small text-muted mb-1">Turbidez (NTU)</label>
+      <input type="number" step="0.01" class="form-control form-control-sm" id="input-turb-ml" placeholder="Ej: 3.20">
+    </div>
+  </div>
+
+  <button class="btn btn-outline-secondary btn-sm w-100 mb-3" onclick="ejecutarAnalisisManualML()">
+    Simular Valores Manuales
+  </button>
+
+  <!-- Caja dinámica del resultado -->
+  <div id="ml-resultado-box" class="p-3 d-none" style="border-radius: 8px;">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <span class="fw-bold fs-6" id="ml-resultado-texto"></span>
+      <span class="badge" id="ml-confianza-badge"></span>
+    </div>
+    <div class="progress" style="height: 8px; background-color: #E2E8F0;">
+      <div id="ml-progreso-barra" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%;"></div>
+    </div>
+    <small class="text-muted d-block mt-2" id="ml-detalle-tecnico"></small>
+  </div>
+</div>
 
     <!-- 3. MÓDULO VISUAL E IA EXPLICABLE (GRAD-CAM XAI) -->
     <section>
