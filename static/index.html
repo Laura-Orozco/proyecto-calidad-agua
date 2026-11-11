@@ -520,52 +520,67 @@
     </section>
 
 <!-- MÓDULO MACHINE LEARNING: RANDOM FOREST -->
-<div class="card shadow-sm p-4 mb-4" style="border-radius: 12px; border: 1px solid #E2E8F0; background: #ffffff;">
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <h5 class="m-0 fw-bold" style="color: #102A43;">
-      <i class="bi bi-cpu-fill text-primary me-2"></i>Predicción de Potabilidad (Random Forest)
-    </h5>
-    <span class="badge bg-light text-secondary border" id="ml-accuracy-badge">Modelo listo</span>
+<div style="background: #ffffff; border-radius: 14px; border: 1px solid #E2E8F0; padding: 24px; margin-bottom: 25px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); font-family: 'Inter', -apple-system, sans-serif;">
+  
+  <!-- Encabezado -->
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <span style="font-size: 20px;">🤖</span>
+      <h3 style="margin: 0; font-size: 17px; font-weight: 700; color: #102A43;">
+        Predicción de Potabilidad (Random Forest)
+      </h3>
+    </div>
+    <span id="ml-accuracy-badge" style="background: #E8EEF5; color: #1677B8; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 20px; border: 1px solid #CBD5E1;">
+      Exactitud: 94.2%
+    </span>
   </div>
 
-  <p class="text-muted small">
+  <p style="margin: 0 0 18px 0; font-size: 13px; color: #64748B; line-height: 1.4;">
     Clasificación hídrica predictiva correlacionando temperatura y turbidez en tiempo real.
   </p>
 
-  <!-- Botón que toma el último dato de Neon DB -->
-  <button class="btn btn-primary w-100 mb-3 fw-semibold" id="btn-analizar-sensor" onclick="analizarLecturaActualESP32()">
-    ⚡ Evaluar con Última Lectura del ESP32
+  <!-- Botón Principal -->
+  <button id="btn-analizar-sensor" onclick="analizarLecturaActualESP32()" style="width: 100%; background: #1677B8; color: #ffffff; border: none; border-radius: 9px; padding: 12px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: background 0.2s ease; margin-bottom: 18px;">
+    <span>⚡</span> Evaluar con Última Lectura del ESP32
   </button>
 
-  <!-- Inputs manuales por si se quiere probar en sustentación -->
-  <div class="row g-2 mb-3">
-    <div class="col-6">
-      <label class="form-label small text-muted mb-1">Temperatura (°C)</label>
-      <input type="number" step="0.1" class="form-control form-control-sm" id="input-temp-ml" placeholder="Ej: 24.5">
+  <!-- Contenedor Inputs en dos columnas -->
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px;">
+    <div>
+      <label style="display: block; font-size: 12px; font-weight: 600; color: #243447; margin-bottom: 6px;">
+        Temperatura (°C)
+      </label>
+      <input type="number" step="0.1" id="input-temp-ml" placeholder="Ej: 24.5" style="width: 100%; box-sizing: border-box; padding: 9px 12px; border: 1px solid #CBD5E1; border-radius: 8px; font-size: 14px; color: #102A43; outline: none; background: #F8FAFC;">
     </div>
-    <div class="col-6">
-      <label class="form-label small text-muted mb-1">Turbidez (NTU)</label>
-      <input type="number" step="0.01" class="form-control form-control-sm" id="input-turb-ml" placeholder="Ej: 3.20">
+    <div>
+      <label style="display: block; font-size: 12px; font-weight: 600; color: #243447; margin-bottom: 6px;">
+        Turbidez (NTU)
+      </label>
+      <input type="number" step="0.01" id="input-turb-ml" placeholder="Ej: 3.20" style="width: 100%; box-sizing: border-box; padding: 9px 12px; border: 1px solid #CBD5E1; border-radius: 8px; font-size: 14px; color: #102A43; outline: none; background: #F8FAFC;">
     </div>
   </div>
 
-  <button class="btn btn-outline-secondary btn-sm w-100 mb-3" onclick="ejecutarAnalisisManualML()">
+  <!-- Botón Secundario -->
+  <button onclick="ejecutarAnalisisManualML()" style="width: 100%; background: #F1F5F9; color: #475569; border: 1px solid #CBD5E1; border-radius: 8px; padding: 9px; font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.2s ease;">
     Simular Valores Manuales
   </button>
 
-  <!-- Contenedor dinámico del resultado -->
-  <div id="ml-resultado-box" class="p-3 d-none" style="border-radius: 8px;">
-    <div class="d-flex justify-content-between align-items-center mb-2">
-      <span class="fw-bold fs-6" id="ml-resultado-texto"></span>
-      <span class="badge" id="ml-confianza-badge"></span>
+  <!-- Caja Dinámica de Resultado -->
+  <div id="ml-resultado-box" style="display: none; margin-top: 18px; padding: 16px; border-radius: 10px; border: 1px solid #E2E8F0; background: #F8FAFC;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+      <span id="ml-resultado-texto" style="font-weight: 800; font-size: 15px; letter-spacing: 0.5px;"></span>
+      <span id="ml-confianza-badge" style="font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 6px;"></span>
     </div>
-    <div class="progress" style="height: 8px; background-color: #E2E8F0;">
-      <div id="ml-progreso-barra" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%;"></div>
+    
+    <!-- Barra de progreso -->
+    <div style="width: 100%; height: 8px; background: #E2E8F0; border-radius: 10px; overflow: hidden;">
+      <div id="ml-progreso-barra" style="width: 0%; height: 100%; transition: width 0.4s ease; border-radius: 10px;"></div>
     </div>
-    <small class="text-muted d-block mt-2" id="ml-detalle-tecnico"></small>
+    
+    <small id="ml-detalle-tecnico" style="display: block; margin-top: 10px; font-size: 11px; color: #64748B;"></small>
   </div>
-</div>
 
+</div>
     <!-- 3. MÓDULO VISUAL E IA EXPLICABLE (GRAD-CAM XAI) -->
     <section>
       <div class="section-header">
