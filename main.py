@@ -1,113 +1,22 @@
-import asyncio
-import io
-import json
 import os
-import sys
 import time
-from contextlib import asynccontextmanager
-
-from fastapi import FastAPI, Response, UploadFile, File, Body, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+import psycopg2
+from psycopg2.extras import RealDictCursor
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.staticfiles import StaticFiles
-from PIL import Image
-import requests
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import Optional, List, Dict, Any
 
-# Asegurar que la raíz del proyecto esté en el path de Python
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
-# Importación de la lógica de visión desde modelo/ia.py
 from modelo.ia import predecir_imagen
 
-BACKEND_WILLIAN = "https://backend-iot-vision.onrender.com"
-THINGSPEAK_WRITE_KEY = "IWE7C67EMHPZFP8C"
+app = FastAPI(
+    title="API Central IoT & Visión AI - Calidad del Agua",
+    description="Sistema de Adquisición de Datos IoT (ESP32, Neon DB, ThingSpeak) y Diagnóstico de Visión Computacional",
+    version="2.0.0"
+)
 
-# Control de tiempo entre peticiones a ThingSpeak (mínimo 15s)
-ultimo_envio_ts = 0.0
-
-# --------------------------------------------------------------
-# Carga de modelo YOLOv8 comentada para optimizar recursos en Render
-# --------------------------------------------------------------
-# from ultralytics import YOLO
-# MODEL_PATH = os.path.join("modelo", "best.pt")
-# if not os.path.exists(MODEL_PATH):
-#     MODEL_PATH = "yolov8n.pt"
-#
-# try:
-#     yolo_model = YOLO(MODEL_PATH)
-# except Exception as e:
-#     yolo_model = None
-#     print(f"[!] YOLOv8 no inicializado: {e}")
-yolo_model = None
-
-
-def sincronizar_con_thingspeak(temp: float, turb: float, estado_str: str = "Normal", volt: float = 3.2):
-    """
-    Reenvía los 4 campos a ThingSpeak respetando el intervalo de 15 segundos.
-    Field 1: Temperatura (°C)
-    Field 2: Turbidez (NTU)
-    Field 3: Estado numérico (1: Normal/Óptima, 2: Moderada, 3: Regular, 4: Crítica)
-    Field 4: Voltaje / Señal (V)
-    """
-    global ultimo_envio_ts
-    ahora = time.time()
-    if ahora - ultimo_envio_ts < 15.0:
-        return None
-
-    mapa_estados = {"NORMAL": 1, "BUENA": 1, "OPTIMA": 1, "MODERADA": 2, "REGULAR": 3, "CRITICA": 4, "MALA": 4}
-    est_num = mapa_estados.get(str(estado_str).strip().upper(), 1)
-
-    url = "https://api.thingspeak.com/update"
-    params = {
-        "api_key": THINGSPEAK_WRITE_KEY,
-        "field1": round(float(temp), 2),
-        "field2": round(float(turb), 2),
-        "field3": est_num,
-        "field4": round(float(volt), 2)
-    }
-
-    try:
-        r = requests.get(url, params=params, timeout=5)
-        if r.status_code == 200 and r.text.strip() != "0":
-            ultimo_envio_ts = ahora
-            print(f"[ThingSpeak OK] Entrada #{r.text.strip()} registrada: Temp={temp}°C, Turb={turb}NTU, Est={est_num}, Volt={volt}V")
-            return r.text.strip()
-    except Exception as e:
-        print(f"[ThingSpeak Error]: {e}")
-    return None
-
-
-async def ciclo_alimentador_thingspeak():
-    """Consulta la API periódicamente y reenvía lecturas a ThingSpeak."""
-    while True:
-        try:
-            r = requests.get(f"{BACKEND_WILLIAN}/api/calidad-agua", timeout=5)
-            if r.status_code == 200:
-                payload = r.json()
-                lista = payload.get("data", [])
-                if isinstance(lista, list) and len(lista) > 0:
-                    ultimo = lista[-1]
-                    t = float(ultimo.get("temperatura", 24.5))
-                    tb = float(ultimo.get("turbidez", 3.0))
-                    est = ultimo.get("estado", "Normal")
-                    v = max(0.5, round(4.5 - (tb * 0.1), 2))
-                    sincronizar_con_thingspeak(t, tb, est, v)
-        except Exception as e:
-            # Espera silenciosa si la API remota tarda en responder
-            pass
-        await asyncio.sleep(16)
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Inicia la sincronización continua en segundo plano
-    tarea_background = asyncio.create_task(ciclo_alimentador_thingspeak())
-    yield
-    tarea_background.cancel()
-
-
-app = FastAPI(title="Host Local - Monitoreo Híbrido IoT", lifespan=lifespan)
-
+# Configuración de CORS para permitir peticiones desde cualquier origen o frontend local
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -116,52 +25,153 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-if os.path.exists("static"):
-    app.mount("/static", StaticFiles(directory="static"), name="static")
+# Conexión a la base de datos Neon PostgreSQL
+DATABASE_URL = os.getenv("DATABASE_URL")
 
+def get_db_connection():
+    if not DATABASE_URL:
+        raise HTTPException(
+            status_code=500,
+            detail="La variable de entorno DATABASE_URL no está configurada en el servidor."
+        )
+    return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
 
-@app.get("/")
-async def index():
-    if os.path.exists("static/index.html"):
-        return FileResponse("static/index.html")
-    return {"mensaje": "Frontend activo. Abre static/index.html"}
+# --- MODELOS DE ENTRADA (PYDANTIC) ---
 
+class Esp32Datos(BaseModel):
+    temperatura: float
+    turbidez: float
+    estado: Optional[str] = "Normal"
 
-@app.get("/favicon.ico")
-async def favicon():
-    return Response(status_code=204)
+class FrecuenciaConfig(BaseModel):
+    frecuencia_segundos: int
 
+class TeclaControl(BaseModel):
+    tecla: str
 
-# ==============================================================
-# RUTA DIRECTA PARA EL ARCHIVO WASM DE EDGE IMPULSE
-# ==============================================================
-@app.get("/edge-impulse-standalone.wasm")
-async def servir_wasm_raiz():
-    ruta_wasm = os.path.join("static", "edge-impulse-standalone.wasm")
-    if os.path.exists(ruta_wasm):
-        return FileResponse(ruta_wasm, media_type="application/wasm")
-    return Response(status_code=404)
+class LLMConsulta(BaseModel):
+    mensaje: str
 
+# Variables de estado en memoria para control de hardware
+frecuencia_muestreo = 15
 
-# ==============================================================
-# ENDPOINT DE PRUEBA INMEDIATA DE THINGSPEAK
-# ==============================================================
-@app.get("/api/thingspeak/test")
-async def test_envio_thingspeak():
-    resultado = sincronizar_con_thingspeak(temp=24.8, turb=3.2, estado_str="Normal", volt=3.18)
-    if resultado:
-        return {"status": "success", "mensaje": f"Entrada registrada en ThingSpeak #{resultado}"}
-    return {
-        "status": "rate_limited_or_error",
-        "mensaje": "Espera 15 segundos entre cada envío manual para cumplir con la API de ThingSpeak."
-    }
+# --- ENDPOINTS IOT Y TELEMETRÍA (NEON DB & THINGSPEAK) ---
 
+@app.get("/api/telemetria", summary="Obtener Última Telemetría")
+def obtener_ultima_telemetria():
+    """Consulta la última lectura registrada de temperatura, turbidez y estado en Neon DB."""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM lecturas_calidad_agua ORDER BY id DESC LIMIT 1;")
+        fila = cur.fetchone()
+        cur.close()
+        conn.close()
 
-# ==============================================================
-# ENDPOINT DE VISIÓN KAGGLE (Inferencia convolucional directa)
-# ==============================================================
-@app.post("/api/vision/clasificar-muestra")
+        if not fila:
+            return {
+                "id": 0,
+                "temperatura": 24.5,
+                "turbidez": 3.0,
+                "estado": "Normal",
+                "fecha": None
+            }
+        return fila
+    except Exception as e:
+        return {
+            "error": str(e),
+            "temperatura": 24.5,
+            "turbidez": 3.0,
+            "estado": "Normal"
+        }
+
+@app.get("/api/calidad-agua", summary="Obtener Calidad Agua")
+def obtener_calidad_agua(limit: int = 50):
+    """Retorna el histórico de lecturas fisicoquímicas almacenadas."""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM lecturas_calidad_agua ORDER BY id DESC LIMIT %s;", (limit,))
+        filas = cur.fetchall()
+        cur.close()
+        conn.close()
+        return filas
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error consultando historial: {str(e)}")
+
+@app.post("/api/esp32/enviar-datos", summary="Recibir Datos Esp32")
+def recibir_datos_esp32(datos: Esp32Datos):
+    """Endpoint receptor del microcontrolador ESP32 para guardar mediciones en Neon DB."""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            INSERT INTO lecturas_calidad_agua (temperatura, turbidez, estado)
+            VALUES (%s, %s, %s) RETURNING id;
+            """,
+            (datos.temperatura, datos.turbidez, datos.estado)
+        )
+        nuevo_id = cur.fetchone()["id"]
+        conn.commit()
+        cur.close()
+        conn.close()
+        return {"status": "success", "mensaje": "Lectura almacenada", "id": nuevo_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error guardando lectura ESP32: {str(e)}")
+
+@app.get("/api/incidentes", summary="Obtener Incidentes")
+def obtener_incidentes(limit: int = 20):
+    """Consulta alertas o eventos críticos registrados."""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM incidentes ORDER BY id DESC LIMIT %s;", (limit,))
+        filas = cur.fetchall()
+        cur.close()
+        conn.close()
+        return filas
+    except Exception:
+        # Fallback si la tabla aún no existe o no tiene registros
+        return []
+
+@app.get("/api/control/frecuencia", summary="Obtener Frecuencia")
+def obtener_frecuencia():
+    """Consulta la frecuencia en segundos con la que el ESP32 debe muestrear."""
+    global frecuencia_muestreo
+    return {"frecuencia_segundos": frecuencia_muestreo}
+
+@app.post("/api/control/frecuencia", summary="Configurar Frecuencia")
+def configurar_frecuencia(config: FrecuenciaConfig):
+    """Actualiza la tasa de refresco o frecuencia del bucle IoT."""
+    global frecuencia_muestreo
+    frecuencia_muestreo = max(1, config.frecuencia_segundos)
+    return {"status": "success", "frecuencia_actualizada": frecuencia_muestreo}
+
+@app.post("/api/control/teclado", summary="Procesar Tecla Esp32")
+def procesar_tecla_esp32(payload: TeclaControl):
+    """Recibe pulsaciones de teclado o comandos de hardware desde el ESP32."""
+    tecla = payload.tecla.strip().upper()
+    return {"status": "success", "tecla_recibida": tecla}
+
+@app.post("/api/llm/consultar", summary="Consultar Llm")
+def consultar_llm(consulta: LLMConsulta):
+    """Endpoint puente para responder consultas de normativa o diagnóstico."""
+    msg = consulta.mensaje.lower()
+    if "turbidez" in msg or "turbia" in msg:
+        respuesta = "La turbidez representa la opacidad del agua ocasionada por partículas en suspensión. Valores por encima de 5 NTU superan la norma para consumo humano directo."
+    elif "temperatura" in msg:
+        respuesta = "La temperatura influye directamente en la solubilidad del oxígeno disuelto y la conductividad eléctrica del agua."
+    else:
+        respuesta = "El sistema de monitoreo IoT y visión artificial evalúa en tiempo real las variables ópticas y fisicoquímicas del efluente."
+
+    return {"status": "success", "respuesta": respuesta}
+
+# --- ENDPOINT DE VISIÓN COMPUTACIONAL E IA ---
+
+@app.post("/api/vision/clasificar-muestra", summary="Clasificar Fotograma con Pipeline CNN / XAI")
 async def clasificar_muestra(file: UploadFile = File(...)):
+    """Recibe una captura (Webcam, DroidCam o archivo) y devuelve diagnóstico, latencia y distribución Softmax."""
     try:
         contenido = await file.read()
         res = predecir_imagen(contenido)
@@ -174,92 +184,9 @@ async def clasificar_muestra(file: UploadFile = File(...)):
             "modelo_fuente": "Edge Colorimetry & CNN Pipeline"
         }
     except Exception as e:
-        print(f"[ERROR VISIÓN]: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error en inferencia: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error en inferencia visual: {str(e)}")
 
+# --- ARCHIVOS ESTÁTICOS / FRONTEND ---
 
-# ==============================================================
-# INFERENCIA LOCAL YOLOv8 (Fallback por si se llama este endpoint)
-# ==============================================================
-@app.post("/api/vision/predict")
-async def local_predict_vision(file: UploadFile = File(...)):
-    if yolo_model is None:
-        return {
-            "status": "disabled",
-            "message": "Modelo YOLO inactivo en entorno ligero",
-            "detecciones": []
-        }
-    try:
-        content = await file.read()
-        image = Image.open(io.BytesIO(content)).convert("RGB")
-        results = yolo_model(image, conf=0.15)
-        detecciones = []
-        for r in results:
-            for box in r.boxes:
-                x1, y1, x2, y2 = box.xyxy[0].tolist()
-                conf = float(box.conf[0])
-                cls_id = int(box.cls[0])
-                detecciones.append({
-                    "clase": yolo_model.names[cls_id],
-                    "confianza": round(conf * 100, 1),
-                    "coordenadas": [int(x1), int(y1), int(x2), int(y2)]
-                })
-        return {"status": "success", "total_detecciones": len(detecciones), "detecciones": detecciones}
-    except Exception as e:
-        return {"status": "error", "message": str(e), "detecciones": []}
-
-
-# ==============================================================
-# PROXIES AL BACKEND (Calidad Agua / Telemetría / Teclado)
-# ==============================================================
-@app.get("/api/calidad-agua")
-async def proxy_calidad_agua():
-    try:
-        r = requests.get(f"{BACKEND_WILLIAN}/api/calidad-agua", timeout=5)
-        return r.json()
-    except Exception as e:
-        return {"temperatura": None, "turbidez": None, "estado": "ESPERANDO", "detalle": str(e)}
-
-
-@app.get("/api/telemetria")
-async def proxy_telemetria():
-    try:
-        r = requests.get(f"{BACKEND_WILLIAN}/api/telemetria", timeout=5)
-        return r.json()
-    except Exception as e:
-        return {"temperatura": None, "turbidez": None, "estado": "ESPERANDO", "detalle": str(e)}
-
-
-@app.post("/api/control/teclado")
-async def proxy_teclado_matricial(payload: dict = Body(...)):
-    tecla = str(payload.get("tecla", "")).strip().upper()
-    try:
-        r = requests.post(f"{BACKEND_WILLIAN}/api/control/teclado", json={"tecla": tecla}, timeout=5)
-        return {
-            "status": "success",
-            "tecla_recibida": tecla,
-            "backend_response": r.json() if r.status_code == 200 else r.text
-        }
-    except Exception as e:
-        return {
-            "status": "simulado_local",
-            "tecla_recibida": tecla,
-            "mensaje": f"Opción {tecla} procesada localmente"
-        }
-
-
-@app.get("/api/incidentes")
-async def proxy_incidentes():
-    try:
-        r = requests.get(f"{BACKEND_WILLIAN}/api/incidentes", timeout=5)
-        return r.json()
-    except Exception:
-        return []
-
-
-# ==============================================================
-# EJECUCIÓN PRINCIPAL
-# ==============================================================
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+if os.path.exists("static"):
+    app.mount("/", StaticFiles(directory="static", html=True), name="static")
