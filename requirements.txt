@@ -1,8 +1,7 @@
 fastapi
-uvicorn[standard]
-paho-mqtt
-fpdf2
-python-multipart
+uvicorn
 pillow
 numpy
-requests
+python-multipart
+pydantic
+psycopg2-binary
