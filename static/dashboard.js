@@ -289,3 +289,239 @@ function formatearFecha(isoString) {
     return isoString;
   }
 }
+// ==========================================================
+// MÓDULO H2O MACHINE LEARNING (PLOTLY & RANDOM FOREST)
+// ==========================================================
+
+document.addEventListener("DOMContentLoaded", () => {
+  inicializarModuloH2O();
+});
+
+async function inicializarModuloH2O() {
+  if (typeof Plotly === "undefined") {
+    console.warn("Cargando Plotly...");
+    return;
+  }
+
+  try {
+    // 1. Cargar métricas del modelo
+    const resMetricas = await fetch("/api/ml/metricas");
+    const jsonMetricas = await resMetricas.json();
+
+    if (jsonMetricas.status === "success") {
+      const d = jsonMetricas.data;
+      if (document.getElementById("metric-accuracy-val")) document.getElementById("metric-accuracy-val").innerText = `${d.accuracy}%`;
+      if (document.getElementById("metric-precision-val")) document.getElementById("metric-precision-val").innerText = `${d.precision}%`;
+      if (document.getElementById("metric-recall-val")) document.getElementById("metric-recall-val").innerText = `${d.recall}%`;
+      if (document.getElementById("metric-f1-val")) document.getElementById("metric-f1-val").innerText = `${d.f1}%`;
+
+      // Dona de efectividad
+      dibujarDonaH2O("donut-accuracy", d.accuracy, 100, "EFECTIVIDAD (%)", "#1677B8", 1);
+      // Matriz Heatmap
+      dibujarMatrizH2O(d.matriz_confusion.raw);
+    }
+
+    // 2. Cargar última lectura de Neon DB para las otras dos donas
+    const resTel = await fetch("/api/telemetria");
+    const tel = await resTel.json();
+    const temp = parseFloat(tel.temperatura) || 24.5;
+    const turb = parseFloat(tel.turbidez) || 3.0;
+
+    dibujarDonaH2O("donut-temp", temp, 100, "TEMPERATURA (°C)", "#0D9488", 1);
+    dibujarDonaH2O("donut-turb", turb, 10, "TURBIDEZ (NTU)", "#4776A8", 2);
+
+    const inT = document.getElementById("input-temp-ml");
+    const inTurb = document.getElementById("input-turb-ml");
+    if (inT && !inT.value) inT.value = temp.toFixed(1);
+    if (inTurb && !inTurb.value) inTurb.value = turb.toFixed(2);
+
+  } catch (err) {
+    console.warn("Aviso inicialización H2O:", err.message);
+  }
+}
+
+// Función para pintar donas idénticas a las de Kevin
+function dibujarDonaH2O(elementId, valor, maxVal, titulo, color, decimales) {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+
+  const visualVal = Math.max(0, Math.min(valor, maxVal));
+  const data = [{
+    values: [visualVal, Math.max(0, maxVal - visualVal)],
+    hole: 0.82,
+    type: "pie",
+    marker: { colors: [color, "#E8EEF5"] },
+    textinfo: "none",
+    hoverinfo: "skip",
+    sort: false
+  }];
+
+  const layout = {
+    showlegend: false,
+    margin: { t: 5, b: 5, l: 5, r: 5 },
+    height: 180,
+    paper_bgcolor: "rgba(0,0,0,0)",
+    annotations: [{
+      text: `<b style='font-size:22px;color:#102A43'>${valor.toFixed(decimales)}</b><br><span style='font-size:9px;color:#64748B;font-weight:700'>${titulo}</span>`,
+      x: 0.5, y: 0.5, showarrow: false
+    }]
+  };
+
+  Plotly.newPlot(elementId, data, layout, { responsive: true, displayModeBar: false });
+}
+
+// Tacómetro / Gauge de confianza
+function dibujarGaugeH2O(confianza, esPotable) {
+  const el = document.getElementById("gauge-confianza");
+  if (!el) return;
+
+  const colorBarra = esPotable ? "#0D9488" : "#DC5252";
+  const data = [{
+    type: "indicator",
+    mode: "gauge+number",
+    value: confianza,
+    number: { suffix: "%", font: { color: "#102A43", size: 28 } },
+    title: { text: "Confianza del Modelo", font: { color: "#64748B", size: 12 } },
+    gauge: {
+      axis: { range: [0, 100], tickcolor: "#64748B" },
+      bar: { color: colorBarra, thickness: 0.25 },
+      bgcolor: "#FFFFFF",
+      steps: [
+        { range: [0, 50], color: "#FEECEC" },
+        { range: [50, 85], color: "#E8EEF5" },
+        { range: [85, 100], color: "#D1FAE5" }
+      ]
+    }
+  }];
+
+  const layout = {
+    height: 180,
+    margin: { l: 20, r: 20, t: 25, b: 10 },
+    paper_bgcolor: "rgba(0,0,0,0)"
+  };
+
+  Plotly.newPlot("gauge-confianza", data, layout, { responsive: true, displayModeBar: false });
+}
+
+// Matriz de confusión interactiva
+function dibujarMatrizH2O(matrizRaw) {
+  const el = document.getElementById("heatmap-confusion");
+  if (!el) return;
+
+  const data = [{
+    z: matrizRaw,
+    x: ["Contaminada", "Potable"],
+    y: ["Contaminada", "Potable"],
+    type: "heatmap",
+    colorscale: [[0, "#EBF3FB"], [1, "#1677B8"]],
+    showscale: false
+  }];
+
+  const anotaciones = [];
+  for (let i = 0; i < 2; i++) {
+    for (let j = 0; j < 2; j++) {
+      anotaciones.push({
+        x: data[0].x[j],
+        y: data[0].y[i],
+        text: `<b>${matrizRaw[i][j]}</b>`,
+        font: { color: "#102A43", size: 16 },
+        showarrow: false
+      });
+    }
+  }
+
+  const layout = {
+    annotations: anotaciones,
+    height: 230,
+    margin: { l: 65, r: 15, t: 15, b: 35 },
+    xaxis: { title: "<b>Predicción</b>" },
+    yaxis: { title: "<b>Real</b>" },
+    paper_bgcolor: "rgba(0,0,0,0)",
+    plot_bgcolor: "rgba(0,0,0,0)"
+  };
+
+  Plotly.newPlot("heatmap-confusion", data, layout, { responsive: true, displayModeBar: false });
+}
+
+// Selector de pestañas dentro de la tarjeta
+function mostrarPestanaH2O(vista) {
+  document.getElementById("h2o-vista-donuts").style.display = vista === "donuts" ? "block" : "none";
+  document.getElementById("h2o-vista-sim").style.display = vista === "sim" ? "block" : "none";
+  document.getElementById("h2o-vista-matriz").style.display = vista === "matriz" ? "block" : "none";
+
+  const btnDonuts = document.getElementById("tab-h2o-donuts");
+  const btnSim = document.getElementById("tab-h2o-sim");
+  const btnMatriz = document.getElementById("tab-h2o-matriz");
+
+  [btnDonuts, btnSim, btnMatriz].forEach(b => {
+    b.style.background = "transparent";
+    b.style.color = "#475569";
+  });
+
+  if (vista === "donuts") {
+    btnDonuts.style.background = "#1677B8";
+    btnDonuts.style.color = "#ffffff";
+  } else if (vista === "sim") {
+    btnSim.style.background = "#1677B8";
+    btnSim.style.color = "#ffffff";
+  } else {
+    btnMatriz.style.background = "#1677B8";
+    btnMatriz.style.color = "#ffffff";
+  }
+}
+
+// Acciones de predicción
+async function analizarLecturaActualESP32() {
+  try {
+    const res = await fetch("/api/telemetria");
+    const data = await res.json();
+    const temp = parseFloat(data.temperatura);
+    const turb = parseFloat(data.turbidez);
+
+    document.getElementById("input-temp-ml").value = temp;
+    document.getElementById("input-turb-ml").value = turb;
+    await procesarPrediccionH2O(temp, turb);
+  } catch (e) {
+    alert("Error consultando sensor: " + e.message);
+  }
+}
+
+async function ejecutarAnalisisManualML() {
+  const temp = parseFloat(document.getElementById("input-temp-ml").value);
+  const turb = parseFloat(document.getElementById("input-turb-ml").value);
+  if (isNaN(temp) || isNaN(turb)) {
+    alert("Por favor ingresa valores numéricos válidos.");
+    return;
+  }
+  await procesarPrediccionH2O(temp, turb);
+}
+
+async function procesarPrediccionH2O(temperatura, turbidez) {
+  mostrarPestanaH2O("sim");
+  const alerta = document.getElementById("ml-alerta-resultado");
+
+  try {
+    const res = await fetch("/api/ml/predecir-potabilidad", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ temperatura, turbidez })
+    });
+    const data = await res.json();
+
+    if (data.status === "success") {
+      dibujarGaugeH2O(data.confianza_porcentaje, data.potable);
+      alerta.style.display = "block";
+      if (data.potable) {
+        alerta.style.background = "#D1FAE5";
+        alerta.style.color = "#065F46";
+        alerta.innerHTML = "💧 AGUA POTABLE: Parámetros aptos.";
+      } else {
+        alerta.style.background = "#FEE2E2";
+        alerta.style.color = "#991B1B";
+        alerta.innerHTML = "⚠️ AGUA CONTAMINADA: Riesgo detectado.";
+      }
+    }
+  } catch (err) {
+    alert("Error en predicción: " + err.message);
+  }
+}
