@@ -211,3 +211,23 @@ async def clasificar_muestra(file: UploadFile = File(...)):
 
 if os.path.exists("static"):
     app.mount("/", StaticFiles(directory="static", html=True), name="static")
+
+# 1. Al inicio de main.py (junto a las importaciones)
+from modelo.ml_potabilidad import predecir_potabilidad, inicializar_modelo_potabilidad
+
+# 2. Entrenar el modelo al arrancar FastAPI
+inicializar_modelo_potabilidad()
+
+# 3. Esquema de entrada Pydantic
+class EntradaML(BaseModel):
+    temperatura: float
+    turbidez: float
+
+# 4. Nuevo endpoint para la inferencia
+@app.post("/api/ml/predecir-potabilidad", summary="Predecir Potabilidad (Random Forest)")
+def predecir_agua(datos: EntradaML):
+    try:
+        resultado = predecir_potabilidad(datos.temperatura, datos.turbidez)
+        return {"status": "success", **resultado}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
