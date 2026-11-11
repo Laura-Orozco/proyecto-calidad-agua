@@ -202,4 +202,118 @@ document.addEventListener("DOMContentLoaded", () => {
   actualizarMetricasAPI();
   setInterval(actualizarMetricasAPI, 5000);
 });
+// ==========================================================
+// MÓDULO MACHINE LEARNING (RANDOM FOREST)
+// ==========================================================
 
+// 1. Consulta la última lectura en Neon DB y la evalúa
+async function analizarLecturaActualESP32() {
+  try {
+    const res = await fetch("/api/telemetria");
+    if (!res.ok) throw new Error("No se pudo obtener la telemetría");
+    const data = await res.json();
+
+    const temp = parseFloat(data.temperatura);
+    const turb = parseFloat(data.turbidez);
+
+    // Rellenar las casillas visuales
+    const inTemp = document.getElementById("input-temp-ml");
+    const inTurb = document.getElementById("input-turb-ml");
+    if (inTemp) inTemp.value = temp;
+    if (inTurb) inTurb.value = turb;
+
+    await enviarInferenciaML(temp, turb);
+  } catch (err) {
+    alert("Error al consultar telemetría: " + err.message);
+  }
+}
+
+// 2. Lee los valores que se escriban en las casillas
+async function ejecutarAnalisisManualML() {
+  const inTemp = document.getElementById("input-temp-ml");
+  const inTurb = document.getElementById("input-turb-ml");
+
+  const temp = parseFloat(inTemp ? inTemp.value : NaN);
+  const turb = parseFloat(inTurb ? inTurb.value : NaN);
+
+  if (isNaN(temp) || isNaN(turb)) {
+    alert("Por favor ingresa valores válidos de temperatura y turbidez.");
+    return;
+  }
+
+  await enviarInferenciaML(temp, turb);
+}
+
+// 3. Envía los datos al endpoint de FastAPI y maqueta el resultado en la tarjeta
+async function enviarInferenciaML(temperatura, turbidez) {
+  const resultBox = document.getElementById("ml-resultado-box");
+  const txtResultado = document.getElementById("ml-resultado-texto");
+  const badgeConfianza = document.getElementById("ml-confianza-badge");
+  const barraProgreso = document.getElementById("ml-progreso-barra");
+  const detalleTecnico = document.getElementById("ml-detalle-tecnico");
+  const accBadge = document.getElementById("ml-accuracy-badge");
+
+  if (!resultBox) return;
+
+  resultBox.classList.remove("d-none");
+  if (txtResultado) txtResultado.innerText = "Analizando con Random Forest...";
+  if (barraProgreso) {
+    barraProgreso.className = "progress-bar progress-bar-striped progress-bar-animated bg-primary";
+    barraProgreso.style.width = "40%";
+  }
+
+  try {
+    const response = await fetch("/api/ml/predecir-potabilidad", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ temperatura, turbidez })
+    });
+
+    const data = await response.json();
+
+    if (data.status === "success") {
+      const esPotable = data.potable;
+      const confianza = data.confianza_porcentaje;
+
+      if (accBadge && data.accuracy_modelo) {
+        accBadge.innerText = `Exactitud: ${data.accuracy_modelo}%`;
+      }
+
+      if (esPotable) {
+        resultBox.style.backgroundColor = "#ECFDF5";
+        resultBox.style.border = "1px solid #A7F3D0";
+        if (txtResultado) {
+          txtResultado.style.color = "#065F46";
+          txtResultado.innerHTML = "💧 AGUA POTABLE";
+        }
+        if (badgeConfianza) badgeConfianza.className = "badge bg-success";
+        if (barraProgreso) barraProgreso.className = "progress-bar bg-success";
+      } else {
+        resultBox.style.backgroundColor = "#FEF2F2";
+        resultBox.style.border = "1px solid #FECACA";
+        if (txtResultado) {
+          txtResultado.style.color = "#991B1B";
+          txtResultado.innerHTML = "⚠️ AGUA CONTAMINADA";
+        }
+        if (badgeConfianza) badgeConfianza.className = "badge bg-danger";
+        if (barraProgreso) barraProgreso.className = "progress-bar bg-danger";
+      }
+
+      if (badgeConfianza) badgeConfianza.innerText = `${confianza}% certeza`;
+      if (barraProgreso) barraProgreso.style.width = `${confianza}%`;
+      if (detalleTecnico) {
+        detalleTecnico.innerText = `Evaluado con Temp: ${temperatura} °C | Turbidez: ${turbidez} NTU`;
+      }
+    } else {
+      throw new Error(data.detail || "Error en la predicción");
+    }
+  } catch (error) {
+    resultBox.style.backgroundColor = "#FFFBEB";
+    resultBox.style.border = "1px solid #FDE68A";
+    if (txtResultado) {
+      txtResultado.style.color = "#92400E";
+      txtResultado.innerText = "Error en evaluación";
+    }
+    if (detalleTecnico) detalleTecnico.innerText = error.message;
+  }
+}
