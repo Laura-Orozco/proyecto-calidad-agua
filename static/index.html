@@ -519,7 +519,7 @@
       </div>
     </section>
 
-<!-- Módulo Machine Learning: Potabilidad -->
+<!-- MÓDULO MACHINE LEARNING: RANDOM FOREST -->
 <div class="card shadow-sm p-4 mb-4" style="border-radius: 12px; border: 1px solid #E2E8F0; background: #ffffff;">
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h5 class="m-0 fw-bold" style="color: #102A43;">
@@ -529,15 +529,15 @@
   </div>
 
   <p class="text-muted small">
-    Clasificación hídrica en tiempo real correlacionando temperatura y turbidez.
+    Clasificación hídrica predictiva correlacionando temperatura y turbidez en tiempo real.
   </p>
 
-  <!-- Botón que jala el último dato de Neon DB -->
+  <!-- Botón que toma el último dato de Neon DB -->
   <button class="btn btn-primary w-100 mb-3 fw-semibold" id="btn-analizar-sensor" onclick="analizarLecturaActualESP32()">
     ⚡ Evaluar con Última Lectura del ESP32
   </button>
 
-  <!-- Inputs manuales -->
+  <!-- Inputs manuales por si se quiere probar en sustentación -->
   <div class="row g-2 mb-3">
     <div class="col-6">
       <label class="form-label small text-muted mb-1">Temperatura (°C)</label>
@@ -553,7 +553,7 @@
     Simular Valores Manuales
   </button>
 
-  <!-- Caja dinámica del resultado -->
+  <!-- Contenedor dinámico del resultado -->
   <div id="ml-resultado-box" class="p-3 d-none" style="border-radius: 8px;">
     <div class="d-flex justify-content-between align-items-center mb-2">
       <span class="fw-bold fs-6" id="ml-resultado-texto"></span>
