@@ -440,7 +440,7 @@
 </head>
 <body>
 
-  <!-- MODAL DE AUTENTICACIÓN GOOGLE (Conectado a auth.js) -->
+  <!-- MODAL DE AUTENTICACIÓN GOOGLE -->
   <div id="loginModal" class="login-modal-overlay">
     <div class="login-modal-card">
       <div style="font-size: 2.5rem; margin-bottom: 10px;">💧</div>
@@ -581,7 +581,6 @@
       </div>
 
       <div class="card ml-card">
-        <!-- Encabezado con selector de vistas -->
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; border-bottom: 1px solid var(--border-card); padding-bottom: 14px;">
           <div>
             <span style="font-size: 0.92rem; font-weight: 700; color: var(--text-title);">
@@ -806,8 +805,7 @@
     <iframe src="https://backend-iot-vision.onrender.com/chat-gui" style="width: 100%; height: 100%; border: none;"></iframe>
   </div>
 
-  <!-- Scripts de Autenticación, Edge Impulse WASM y Dashboard -->
-  <script src="/static/auth.js"></script>
+  <!-- Scripts de Edge Impulse WASM y Dashboard -->
   <script src="/static/edge-impulse-standalone.js"></script>
   <script src="/static/run-impulse.js"></script>
   <script src="/static/dashboard.js"></script>
@@ -835,7 +833,6 @@
         if (ifrTemp) ifrTemp.src = "https://thingspeak.com/channels/3543191/charts/1?bgcolor=%230f172a&color=%233b82f6&dynamic=true&results=60&type=line&update=15";
       }
 
-      // Redibujar gráficos de Plotly para adaptar colores de texto al tema
       if (typeof inicializarModuloH2O === "function") {
         inicializarModuloH2O();
       }
@@ -1325,6 +1322,139 @@
     }
 
     document.addEventListener("DOMContentLoaded", inicializarModuloH2O);
+  </script>
+
+  <!-- Lógica de Autenticación Google integrada -->
+  <script>
+    const GOOGLE_CLIENT_ID = "275518954514-4t4dasa1mcetqimvlclsge2qmq1ka157.apps.googleusercontent.com";
+
+    function mostrarModalLogin() {
+      const modal = document.getElementById("loginModal");
+      if (modal) modal.style.display = "flex";
+    }
+
+    function ocultarModalLogin() {
+      const modal = document.getElementById("loginModal");
+      if (modal) modal.style.display = "none";
+    }
+
+    function actualizarInterfazUsuario(usuario) {
+      const lblNombre = document.getElementById("usuarioNombre");
+      const imgAvatar = document.getElementById("usuarioAvatar");
+
+      if (lblNombre) {
+        lblNombre.innerText = usuario.name || usuario.email || "Operador";
+      }
+
+      if (imgAvatar) {
+        if (usuario.picture) {
+          imgAvatar.src = usuario.picture;
+          imgAvatar.style.display = "inline-block";
+        } else {
+          imgAvatar.src = "";
+          imgAvatar.style.display = "none";
+        }
+      }
+    }
+
+    function manejarCredencialGoogle(response) {
+      try {
+        const base64Url = response.credential.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(
+          atob(base64).split('').map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')
+        );
+
+        const usuario = JSON.parse(jsonPayload);
+        localStorage.setItem("usuario_sesion", JSON.stringify(usuario));
+
+        ocultarModalLogin();
+        actualizarInterfazUsuario(usuario);
+      } catch (err) {
+        console.error("[Auth] Error procesando credencial:", err);
+      }
+    }
+
+    function renderizarBotonGoogle() {
+      if (window.google && window.google.accounts && window.google.accounts.id) {
+        try {
+          google.accounts.id.initialize({
+            client_id: GOOGLE_CLIENT_ID,
+            callback: manejarCredencialGoogle,
+            auto_select: false
+          });
+
+          const container = document.getElementById("googleBtnContainer");
+          if (container) {
+            container.innerHTML = "";
+            google.accounts.id.renderButton(container, {
+              theme: "outline",
+              size: "large",
+              shape: "rectangular",
+              text: "signin_with",
+              locale: "es",
+              width: 280
+            });
+          }
+        } catch (e) {
+          console.warn("[Auth] Esperando Google Identity...", e);
+        }
+      } else {
+        setTimeout(renderizarBotonGoogle, 200);
+      }
+    }
+
+    function bypassDesarrollo() {
+      const userDev = {
+        name: "Operador de Laboratorio",
+        email: "lab.ia@universidad.edu.co",
+        picture: ""
+      };
+      localStorage.setItem("usuario_sesion", JSON.stringify(userDev));
+      ocultarModalLogin();
+      actualizarInterfazUsuario(userDev);
+    }
+
+    function cerrarSesion() {
+      localStorage.removeItem("usuario_sesion");
+      sessionStorage.clear();
+
+      if (window.google && window.google.accounts && window.google.accounts.id) {
+        google.accounts.id.disableAutoSelect();
+      }
+
+      const lblNombre = document.getElementById("usuarioNombre");
+      const imgAvatar = document.getElementById("usuarioAvatar");
+      if (lblNombre) lblNombre.innerText = "No autenticado";
+      if (imgAvatar) {
+        imgAvatar.src = "";
+        imgAvatar.style.display = "none";
+      }
+
+      mostrarModalLogin();
+      renderizarBotonGoogle();
+    }
+
+    function verificarEstadoSesion() {
+      const sesionGuardada = localStorage.getItem("usuario_sesion");
+      if (!sesionGuardada) {
+        mostrarModalLogin();
+        renderizarBotonGoogle();
+      } else {
+        try {
+          const usuario = JSON.parse(sesionGuardada);
+          if (!usuario || (!usuario.email && !usuario.name)) throw new Error("Sesión inválida");
+          ocultarModalLogin();
+          actualizarInterfazUsuario(usuario);
+        } catch (e) {
+          localStorage.removeItem("usuario_sesion");
+          mostrarModalLogin();
+          renderizarBotonGoogle();
+        }
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", verificarEstadoSesion);
   </script>
 
 </body>
