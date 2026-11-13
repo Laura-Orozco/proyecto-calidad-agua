@@ -1,5 +1,5 @@
 // static/auth.js - Módulo de Autenticación con Google Identity Services
-const GOOGLE_CLIENT_ID = "275518954514-4t4dasa1mcetqimvlclsge2qmq1ka157.apps.googleusercontent.com";
+const GOOGLE_CLIENT_ID = "144217789481-591ojt4dohgjmm7542cohgef6hr9228k.apps.googleusercontent.com";
 
 /**
  * Muestra el modal superpuesto bloqueando la vista de la estación.
