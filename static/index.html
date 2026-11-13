@@ -1049,78 +1049,6 @@
     }
   </script>
 
-  <!-- Script: Consulta de Telemetría desde Neon -->
-  <script>
-    const API_ENDPOINT_TELEMETRIA = "/api/telemetria";
-
-    function renderizarBarrasEstado(estadoRecibido) {
-      if (!estadoRecibido) return;
-      const estado = estadoRecibido.toString().toLowerCase().trim();
-
-      const bNormal = document.getElementById("bar-normal");
-      const bModerada = document.getElementById("bar-moderada");
-      const bRegular = document.getElementById("bar-regular");
-      const bCritica = document.getElementById("bar-critica");
-      const badge = document.getElementById("badgeEstadoTexto");
-      const label = document.getElementById("detalleEstadoUltimo");
-
-      [bNormal, bModerada, bRegular, bCritica].forEach(b => {
-        if (b) {
-          b.setAttribute("y", "178");
-          b.setAttribute("height", "2");
-          b.setAttribute("fill", "var(--border-card)");
-        }
-      });
-
-      if (label) label.textContent = estadoRecibido;
-
-      if (estado.includes("critica") || estado.includes("crítica")) {
-        if (bCritica) { bCritica.setAttribute("y", "30"); bCritica.setAttribute("height", "150"); bCritica.setAttribute("fill", "#ef4444"); }
-        if (badge) { badge.textContent = "Crítica"; badge.style.backgroundColor = "rgba(239,68,68,0.2)"; badge.style.color = "#ef4444"; }
-      } else if (estado.includes("regular") || estado.includes("alerta")) {
-        if (bRegular) { bRegular.setAttribute("y", "30"); bRegular.setAttribute("height", "150"); bRegular.setAttribute("fill", "#f59e0b"); }
-        if (badge) { badge.textContent = "Regular"; badge.style.backgroundColor = "rgba(245,158,11,0.2)"; badge.style.color = "#f59e0b"; }
-      } else if (estado.includes("moderada")) {
-        if (bModerada) { bModerada.setAttribute("y", "30"); bModerada.setAttribute("height", "150"); bModerada.setAttribute("fill", "#3b82f6"); }
-        if (badge) { badge.textContent = "Moderada"; badge.style.backgroundColor = "rgba(59,130,246,0.2)"; badge.style.color = "#3b82f6"; }
-      } else {
-        if (bNormal) { bNormal.setAttribute("y", "30"); bNormal.setAttribute("height", "150"); bNormal.setAttribute("fill", "#10b981"); }
-        if (badge) { badge.textContent = "Normal"; badge.style.backgroundColor = "rgba(16,185,129,0.2)"; badge.style.color = "#10b981"; }
-      }
-    }
-
-async function actualizarEstadoDesdeNeon() {
-      try {
-        const respuesta = await fetch("/api/telemetria");
-        if (!respuesta.ok) return;
-        const telemetria = await respuesta.json();
-
-        // 1. Actualizar gráfico de barras (Índice de Calidad)
-        if (telemetria && telemetria.estado) {
-          renderizarBarrasEstado(telemetria.estado);
-        }
-
-        // 2. Actualizar en tiempo real las donas de Kevin (Temperatura y Turbidez)
-        if (telemetria && typeof Plotly !== "undefined") {
-          const temp = parseFloat(telemetria.temperatura);
-          const turb = parseFloat(telemetria.turbidez);
-
-          if (!isNaN(temp) && document.getElementById("donut-temp")) {
-            dibujarDonaH2O("donut-temp", temp, 100, "TEMPERATURA (°C)", "#10b981", 1);
-          }
-          if (!isNaN(turb) && document.getElementById("donut-turb")) {
-            dibujarDonaH2O("donut-turb", turb, 10, "TURBIDEZ (NTU)", "#06b6d4", 2);
-          }
-        }
-      } catch (err) {
-        console.error("Error al consultar telemetría:", err);
-      }
-    }
-
-    actualizarEstadoDesdeNeon();
-    setInterval(actualizarEstadoDesdeNeon, 3000);
-  </script>
-
   <!-- Script: Gráficos H2O (Donas, Gauge y Matriz) adaptados al Tema Claro/Oscuro -->
   <script>
     function obtenerColoresTemaPlotly() {
@@ -1255,15 +1183,18 @@ async function actualizarEstadoDesdeNeon() {
         const resMetricas = await fetch("/api/ml/metricas");
         const jsonMetricas = await resMetricas.json();
 
-        if (jsonMetricas.status === "success") {
+        if (jsonMetricas && jsonMetricas.status === "success" && jsonMetricas.data) {
           const d = jsonMetricas.data;
-          document.getElementById("metric-accuracy-val").innerText = `${d.accuracy}%`;
+          const acc = parseFloat(d.accuracy) || 0;
+          document.getElementById("metric-accuracy-val").innerText = `${acc}%`;
           document.getElementById("metric-precision-val").innerText = `${d.precision}%`;
           document.getElementById("metric-recall-val").innerText = `${d.recall}%`;
           document.getElementById("metric-f1-val").innerText = `${d.f1}%`;
 
-          dibujarDonaH2O("donut-accuracy", d.accuracy, 100, "EFECTIVIDAD (%)", "#3b82f6", 1);
-          dibujarMatrizH2O(d.matriz_confusion.raw);
+          dibujarDonaH2O("donut-accuracy", acc, 100, "EFECTIVIDAD (%)", "#3b82f6", 1);
+          if (d.matriz_confusion && d.matriz_confusion.raw) {
+            dibujarMatrizH2O(d.matriz_confusion.raw);
+          }
         }
 
         const resTel = await fetch("/api/telemetria");
@@ -1339,6 +1270,78 @@ async function actualizarEstadoDesdeNeon() {
     }
 
     document.addEventListener("DOMContentLoaded", inicializarModuloH2O);
+  </script>
+
+  <!-- Script: Consulta en Tiempo Real desde Neon DB (Barras + Donas cada 3s) -->
+  <script>
+    const API_ENDPOINT_TELEMETRIA = "/api/telemetria";
+
+    function renderizarBarrasEstado(estadoRecibido) {
+      if (!estadoRecibido) return;
+      const estado = estadoRecibido.toString().toLowerCase().trim();
+
+      const bNormal = document.getElementById("bar-normal");
+      const bModerada = document.getElementById("bar-moderada");
+      const bRegular = document.getElementById("bar-regular");
+      const bCritica = document.getElementById("bar-critica");
+      const badge = document.getElementById("badgeEstadoTexto");
+      const label = document.getElementById("detalleEstadoUltimo");
+
+      [bNormal, bModerada, bRegular, bCritica].forEach(b => {
+        if (b) {
+          b.setAttribute("y", "178");
+          b.setAttribute("height", "2");
+          b.setAttribute("fill", "var(--border-card)");
+        }
+      });
+
+      if (label) label.textContent = estadoRecibido;
+
+      if (estado.includes("critica") || estado.includes("crítica")) {
+        if (bCritica) { bCritica.setAttribute("y", "30"); bCritica.setAttribute("height", "150"); bCritica.setAttribute("fill", "#ef4444"); }
+        if (badge) { badge.textContent = "Crítica"; badge.style.backgroundColor = "rgba(239,68,68,0.2)"; badge.style.color = "#ef4444"; }
+      } else if (estado.includes("regular") || estado.includes("alerta")) {
+        if (bRegular) { bRegular.setAttribute("y", "30"); bRegular.setAttribute("height", "150"); bRegular.setAttribute("fill", "#f59e0b"); }
+        if (badge) { badge.textContent = "Regular"; badge.style.backgroundColor = "rgba(245,158,11,0.2)"; badge.style.color = "#f59e0b"; }
+      } else if (estado.includes("moderada")) {
+        if (bModerada) { bModerada.setAttribute("y", "30"); bModerada.setAttribute("height", "150"); bModerada.setAttribute("fill", "#3b82f6"); }
+        if (badge) { badge.textContent = "Moderada"; badge.style.backgroundColor = "rgba(59,130,246,0.2)"; badge.style.color = "#3b82f6"; }
+      } else {
+        if (bNormal) { bNormal.setAttribute("y", "30"); bNormal.setAttribute("height", "150"); bNormal.setAttribute("fill", "#10b981"); }
+        if (badge) { badge.textContent = "Normal"; badge.style.backgroundColor = "rgba(16,185,129,0.2)"; badge.style.color = "#10b981"; }
+      }
+    }
+
+    async function actualizarEstadoDesdeNeon() {
+      try {
+        const respuesta = await fetch(API_ENDPOINT_TELEMETRIA);
+        if (!respuesta.ok) return;
+        const telemetria = await respuesta.json();
+
+        // 1. Actualizar gráfico de barras (Índice de Calidad)
+        if (telemetria && telemetria.estado) {
+          renderizarBarrasEstado(telemetria.estado);
+        }
+
+        // 2. Actualizar en tiempo real las donas de Temperatura y Turbidez
+        if (telemetria && typeof Plotly !== "undefined") {
+          const temp = parseFloat(telemetria.temperatura);
+          const turb = parseFloat(telemetria.turbidez);
+
+          if (!isNaN(temp) && document.getElementById("donut-temp")) {
+            dibujarDonaH2O("donut-temp", temp, 100, "TEMPERATURA (°C)", "#10b981", 1);
+          }
+          if (!isNaN(turb) && document.getElementById("donut-turb")) {
+            dibujarDonaH2O("donut-turb", turb, 10, "TURBIDEZ (NTU)", "#06b6d4", 2);
+          }
+        }
+      } catch (err) {
+        console.error("Error al consultar telemetría:", err);
+      }
+    }
+
+    actualizarEstadoDesdeNeon();
+    setInterval(actualizarEstadoDesdeNeon, 3000);
   </script>
 
   <!-- Lógica de Autenticación Google integrada -->
