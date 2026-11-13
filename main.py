@@ -3,13 +3,13 @@ import time
 import io
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+from typing import Optional
 
-# Importar módulo Random Forest (H2O)
 from modelo.ml_potabilidad import (
     inicializar_modelo_potabilidad,
     obtener_metricas_modelo,
@@ -18,7 +18,6 @@ from modelo.ml_potabilidad import (
 
 app = FastAPI(title="Sistema de Monitoreo de Calidad del Agua | IoT & IA")
 
-# Configuración CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -27,33 +26,81 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Cadena de conexión Neon PostgreSQL
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://neondb_owner:npg_tu_password@ep-tu-host.us-east-2.aws.neon.tech/neondb?sslmode=require"
-)
+DATABASE_URL = os.getenv("DATABASE_URL", "")
 
 def get_db_connection():
+    if not DATABASE_URL:
+        raise ValueError("La variable de entorno DATABASE_URL no está configurada en Render.")
     return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
 
-# Inicializar modelo Random Forest al arrancar FastAPI
-inicializar_modelo_potabilidad()
+def asegurar_tabla_bd():
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS calidad_agua (
+                id SERIAL PRIMARY KEY,
+                identificador VARCHAR(100) DEFAULT 'calidad_agua',
+                temperatura DOUBLE PRECISION NOT NULL,
+                turbidez DOUBLE PRECISION NOT NULL,
+                estado VARCHAR(50) DEFAULT 'Normal',
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        print(f"[DB Warning] No se pudo verificar la tabla al iniciar: {e}")
 
-# ==========================================================
-# MODELOS PYDANTIC
-# ==========================================================
-class TelemetriaIn(BaseModel):
-    identificador: str = "calidad_agua"
-    temperatura: float
-    turbidez: float
-    estado: str = "Normal"
+asegurar_tabla_bd()
+inicializar_modelo_potabilidad()
 
 class PrediccionMLIn(BaseModel):
     temperatura: float
     turbidez: float
 
 # ==========================================================
-# ENDPOINTS DE TELEMETRÍA IOT (NEON DB / ESP32)
+# RUTA EXACTA PARA EL ESP32 (/api/esp32/enviar-datos)
+# ==========================================================
+@app.post("/api/esp32/enviar-datos")
+@app.post("/api/telemetria")
+async def recibir_datos_esp32(request: Request):
+    try:
+        payload = await request.json()
+        # Acepta múltiples nombres de clave por si el ESP32 envía temp/temperatura o turb/turbidez
+        temp = float(payload.get("temperatura") or payload.get("temp") or payload.get("Temperature") or 0.0)
+        turb = float(payload.get("turbidez") or payload.get("turb") or payload.get("Turbidity") or 0.0)
+        identificador = str(payload.get("identificador") or payload.get("nodo") or "calidad_agua")
+        
+        estado = payload.get("estado")
+        if not estado:
+            if turb > 10.0:
+                estado = "Crítica"
+            elif turb > 5.0:
+                estado = "Moderada"
+            else:
+                estado = "Normal"
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO calidad_agua (identificador, temperatura, turbidez, estado) "
+            "VALUES (%s, %s, %s, %s) RETURNING id;",
+            (identificador, temp, turb, estado)
+        )
+        nuevo_id = cur.fetchone()["id"]
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        return {"status": "success", "id": nuevo_id, "estado_calculado": estado}
+    except Exception as e:
+        print(f"[Error ESP32 POST]: {e}")
+        raise HTTPException(status_code=500, detail=f"Error guardando lectura: {str(e)}")
+
+# ==========================================================
+# ENDPOINTS DE CONSULTA PARA EL DASHBOARD
 # ==========================================================
 @app.get("/api/telemetria")
 def obtener_ultima_telemetria():
@@ -78,6 +125,7 @@ def obtener_ultima_telemetria():
             "timestamp": None
         }
     except Exception as e:
+        print(f"[Error GET /api/telemetria]: {e}")
         return {
             "identificador": "calidad_agua",
             "temperatura": 24.5,
@@ -87,7 +135,7 @@ def obtener_ultima_telemetria():
         }
 
 @app.get("/api/calidad-agua")
-def obtener_historial(limit: int = 15):
+def obtener_historial(limit: int = 10):
     try:
         conn = get_db_connection()
         cur = conn.cursor()
@@ -101,35 +149,18 @@ def obtener_historial(limit: int = 15):
         conn.close()
         return [dict(f) for f in filas]
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error consultando historial: {str(e)}")
-
-@app.post("/api/telemetria")
-def registrar_telemetria(dato: TelemetriaIn):
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute(
-            "INSERT INTO calidad_agua (identificador, temperatura, turbidez, estado) "
-            "VALUES (%s, %s, %s, %s) RETURNING id;",
-            (dato.identificador, dato.temperatura, dato.turbidez, dato.estado)
-        )
-        nuevo_id = cur.fetchone()["id"]
-        conn.commit()
-        cur.close()
-        conn.close()
-        return {"status": "success", "id": nuevo_id}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error guardando telemetría: {str(e)}")
+        print(f"[Error GET /api/calidad-agua]: {e}")
+        return []
 
 # ==========================================================
-# ENDPOINTS DE MACHINE LEARNING (RANDOM FOREST H2O)
+# ENDPOINTS MACHINE LEARNING (RANDOM FOREST H2O)
 # ==========================================================
 @app.get("/api/ml/metricas")
 def endpoint_metricas_ml():
     try:
         metricas = obtener_metricas_modelo()
         if not metricas:
-            raise HTTPException(status_code=404, detail="No se pudo cargar water_quality.csv")
+            raise HTTPException(status_code=404, detail="No se encontró water_quality.csv")
         return {"status": "success", "data": metricas}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -156,7 +187,6 @@ async def clasificar_muestra_visual(file: UploadFile = File(...)):
     inicio = time.time()
     try:
         contenido = await file.read()
-        # Si tienes un módulo modelo/ia.py con Keras, lo intenta usar; si no, evalúa perfil cromático/turbidez óptica
         try:
             from modelo.ia import predecir_imagen
             res_ia = predecir_imagen(contenido)
@@ -176,7 +206,6 @@ async def clasificar_muestra_visual(file: UploadFile = File(...)):
             arr = np.array(img, dtype=np.float32)
             r_mean, g_mean, b_mean = arr[:, :, 0].mean(), arr[:, :, 1].mean(), arr[:, :, 2].mean()
 
-            # Relación óptica azul vs tonos ocres/sedimentos
             indice_claridad = b_mean - (r_mean * 0.65 + g_mean * 0.35)
             if indice_claridad > 12:
                 diagnostico = "Agua Limpia / Óptima"
