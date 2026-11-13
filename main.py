@@ -8,7 +8,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-from typing import Optional
 
 from modelo.ml_potabilidad import (
     inicializar_modelo_potabilidad,
@@ -68,7 +67,6 @@ class PrediccionMLIn(BaseModel):
 async def recibir_datos_esp32(request: Request):
     try:
         payload = await request.json()
-        # Acepta múltiples nombres de clave por si el ESP32 envía temp/temperatura o turb/turbidez
         temp = float(payload.get("temperatura") or payload.get("temp") or payload.get("Temperature") or 0.0)
         turb = float(payload.get("turbidez") or payload.get("turb") or payload.get("Turbidity") or 0.0)
         identificador = str(payload.get("identificador") or payload.get("nodo") or "calidad_agua")
@@ -100,7 +98,7 @@ async def recibir_datos_esp32(request: Request):
         raise HTTPException(status_code=500, detail=f"Error guardando lectura: {str(e)}")
 
 # ==========================================================
-# ENDPOINTS DE CONSULTA PARA EL DASHBOARD
+# ENDPOINTS DE CONSULTA Y CONTROL PARA EL DASHBOARD
 # ==========================================================
 @app.get("/api/telemetria")
 def obtener_ultima_telemetria():
@@ -152,6 +150,10 @@ def obtener_historial(limit: int = 10):
         print(f"[Error GET /api/calidad-agua]: {e}")
         return []
 
+@app.get("/api/control/frecuencia")
+def obtener_frecuencia():
+    return {"frecuencia": 3000, "status": "ok"}
+
 # ==========================================================
 # ENDPOINTS MACHINE LEARNING (RANDOM FOREST H2O)
 # ==========================================================
@@ -160,7 +162,7 @@ def endpoint_metricas_ml():
     try:
         metricas = obtener_metricas_modelo()
         if not metricas:
-            raise HTTPException(status_code=404, detail="No se encontró water_quality.csv")
+            raise HTTPException(status_code=404, detail="No se encontró water_quality.csv en el repositorio.")
         return {"status": "success", "data": metricas}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
