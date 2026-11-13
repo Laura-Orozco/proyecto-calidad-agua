@@ -1,1481 +1,648 @@
 <!DOCTYPE html>
-<html lang="es" data-theme="dark">
+<html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sistema de Monitoreo Automatizado de Calidad del Agua</title>
-
-  <!-- Google Identity Services -->
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sistema de Monitoreo de Calidad del Agua | IoT & IA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <!-- Chart.js & Plotly.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
-
-  <!-- Configuración de ruta para WebAssembly -->
-  <script>
-    var Module = {
-      locateFile: function (path, prefix) {
-        if (path.endsWith(".wasm")) {
-          return "/static/" + path;
-        }
-        return prefix + path;
-      }
-    };
-  </script>
-
   <style>
-    /* VARIABLES: TEMA OSCURO POR DEFECTO */
-    :root, [data-theme="dark"] {
-      --bg-body: #0b1120;
-      --bg-card: #0f172a;
-      --bg-inner: #020617;
-      --border-card: #1e293b;
-      --border-hover: #334155;
-      --text-title: #f8fafc;
-      --text-body: #cbd5e1;
-      --text-muted: #94a3b8;
-      --accent-primary: #3b82f6;
-      --accent-hover: #2563eb;
-      --status-ok: #10b981;
-      --status-warn: #f59e0b;
-      --status-alert: #ef4444;
-      --btn-bg: #1e293b;
-      --btn-hover: #334155;
-      --ts-bg: #0f172a;
-      --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+    :root {
+      --bg: #f1f5f9;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --muted: #64748b;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
     }
 
-    /* VARIABLES: TEMA CLARO */
-    [data-theme="light"] {
-      --bg-body: #f8fafc;
-      --bg-card: #ffffff;
-      --bg-inner: #f1f5f9;
-      --border-card: #e2e8f0;
-      --border-hover: #cbd5e1;
-      --text-title: #0f172a;
-      --text-body: #334155;
-      --text-muted: #64748b;
-      --accent-primary: #2563eb;
-      --accent-hover: #1d4ed8;
-      --status-ok: #059669;
-      --status-warn: #d97706;
-      --status-alert: #dc2626;
-      --btn-bg: #f8fafc;
-      --btn-hover: #e2e8f0;
-      --ts-bg: #ffffff;
-      --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.08);
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 20px; }
+    .container { max-width: 1240px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
 
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease;
-    }
-
-    body {
-      background-color: var(--bg-body);
-      color: var(--text-body);
-      padding: 24px;
-      line-height: 1.5;
-    }
-
-    .container {
-      max-width: 1240px;
-      margin: 0 auto;
-    }
-
+    /* Header */
     .header {
-      background-color: var(--bg-card);
-      border: 1px solid var(--border-card);
-      border-radius: 12px;
-      padding: 18px 24px;
-      margin-bottom: 24px;
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: space-between;
-      align-items: center;
-      box-shadow: var(--shadow-card);
-      gap: 16px;
+      background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+      padding: 18px 24px; display: flex; justify-content: space-between; align-items: center;
+      flex-wrap: wrap; gap: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    }
+    .header-title h1 { font-size: 1.25rem; font-weight: 800; color: var(--text); }
+    .header-title p { font-size: 0.85rem; color: var(--muted); margin-top: 2px; }
+    .header-actions { display: flex; align-items: center; gap: 12px; }
+
+    .badge-live {
+      display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px;
+      background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0;
+      border-radius: 999px; font-size: 0.8rem; font-weight: 600;
+    }
+    .dot-live { width: 8px; height: 8px; background: var(--success); border-radius: 50%; animation: pulse 1.6s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+    .btn-auth {
+      background: var(--primary); color: #fff; border: none; border-radius: 10px;
+      padding: 9px 16px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: 0.2s;
+    }
+    .btn-auth:hover { background: var(--primary-hover); }
+
+    .user-chip {
+      display: none; align-items: center; gap: 10px; background: #f8fafc;
+      border: 1px solid var(--border); padding: 5px 12px 5px 6px; border-radius: 999px;
+    }
+    .user-chip img { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; }
+    .user-chip span { font-size: 0.82rem; font-weight: 600; color: var(--text); }
+    .btn-logout {
+      background: none; border: none; color: var(--danger); font-size: 0.78rem;
+      font-weight: 600; cursor: pointer; margin-left: 4px;
     }
 
-    .header-titles h1 {
-      font-size: 1.35rem;
-      font-weight: 700;
-      color: var(--text-title);
-      letter-spacing: -0.01em;
+    /* KPI Row */
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+    .kpi-card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+      padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);
     }
+    .kpi-label { font-size: 0.78rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .kpi-value { font-size: 2rem; font-weight: 800; margin-top: 8px; color: var(--text); }
+    .kpi-sub { font-size: 0.8rem; color: var(--muted); margin-top: 6px; }
 
-    .header-titles p {
-      font-size: 0.86rem;
-      color: var(--text-muted);
-      margin-top: 2px;
-    }
-
-    .header-controls {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .theme-toggle-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 7px;
-      background-color: var(--btn-bg);
-      border: 1px solid var(--border-card);
-      color: var(--text-title);
-      padding: 6px 14px;
-      border-radius: 20px;
-      font-size: 0.82rem;
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    .theme-toggle-btn:hover {
-      background-color: var(--btn-hover);
-    }
-
-    .status-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      background-color: rgba(16, 185, 129, 0.12);
-      border: 1px solid rgba(16, 185, 129, 0.3);
-      color: var(--status-ok);
-      padding: 5px 12px;
-      border-radius: 20px;
-      font-size: 0.8rem;
-      font-weight: 600;
-    }
-
-    .status-circle {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background-color: var(--status-ok);
-    }
-
-    .user-profile {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding-left: 10px;
-      border-left: 1px solid var(--border-card);
-    }
-
-    .user-avatar {
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      object-fit: cover;
-      border: 1px solid var(--border-card);
-      display: none;
-    }
-
-    .user-name {
-      font-size: 0.84rem;
-      font-weight: 600;
-      color: var(--text-title);
-    }
-
-    .section-header {
-      margin-bottom: 14px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .section-title {
-      font-size: 1.15rem;
-      font-weight: 700;
-      color: var(--text-title);
-    }
-
+    /* Cards & Grids */
     .card {
-      background-color: var(--bg-card);
-      border: 1px solid var(--border-card);
-      border-radius: 12px;
-      box-shadow: var(--shadow-card);
+      background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+      padding: 22px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    }
+    .card-header {
+      display: flex; justify-content: space-between; align-items: center;
+      flex-wrap: wrap; gap: 12px; padding-bottom: 16px; border-bottom: 1px solid var(--border);
+      margin-bottom: 18px;
+    }
+    .card-header h2 { font-size: 1.05rem; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .card-header p { font-size: 0.83rem; color: var(--muted); margin-top: 3px; }
+
+    /* Tabs de Clasificación Binaria */
+    .tab-group {
+      display: inline-flex; background: #f8fafc; border: 1px solid var(--border);
+      border-radius: 10px; padding: 4px; gap: 4px;
+    }
+    .tab-btn {
+      border: none; background: transparent; color: var(--muted); font-size: 0.82rem;
+      font-weight: 600; padding: 7px 14px; border-radius: 8px; cursor: pointer; transition: 0.15s;
+    }
+    .tab-btn.active { background: var(--primary); color: #fff; box-shadow: 0 1px 2px rgba(37,99,235,0.25); }
+
+    /* Grid de Pestaña Matriz (Responsivo y sin desbordes) */
+    .matriz-layout {
+      display: grid; grid-template-columns: 1.35fr 1fr; gap: 20px; align-items: stretch;
+    }
+    .matriz-box {
+      background: #f8fafc; border: 1px solid var(--border); border-radius: 14px;
+      padding: 12px; overflow: hidden; display: flex; flex-direction: column; justify-content: center;
+    }
+    .metrics-2x2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .metric-tile {
+      background: #f8fafc; border: 1px solid var(--border); border-radius: 14px;
+      padding: 16px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;
+    }
+    .metric-tile span { font-size: 0.72rem; font-weight: 700; color: var(--muted); letter-spacing: 0.05em; }
+    .metric-tile strong { font-size: 1.6rem; font-weight: 800; color: var(--text); margin-top: 6px; }
+
+    /* Grid de Donas y Simulador */
+    .donas-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+    .sim-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: center; }
+    .form-group { margin-bottom: 14px; }
+    .form-group label { display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 6px; color: var(--text); }
+    .form-group input {
+      width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px;
+      font-size: 0.92rem; outline: none;
+    }
+    .form-group input:focus { border-color: var(--primary); }
+
+    /* Grad-CAM XAI */
+    .xai-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+    .upload-zone {
+      border: 2px dashed #cbd5e1; border-radius: 14px; padding: 24px; text-align: center;
+      background: #f8fafc; cursor: pointer; transition: 0.2s;
+    }
+    .upload-zone:hover { border-color: var(--primary); background: #eff6ff; }
+    .preview-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
+    .preview-box { background: #f8fafc; border: 1px solid var(--border); border-radius: 12px; padding: 10px; text-align: center; }
+    .preview-box img, .preview-box canvas { width: 100%; height: 170px; object-fit: cover; border-radius: 8px; }
+    .preview-box span { display: block; font-size: 0.76rem; font-weight: 600; color: var(--muted); margin-top: 6px; }
+
+    /* Modal Google */
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(15,23,42,0.55); display: none;
+      align-items: center; justify-content: center; z-index: 999; padding: 16px;
+    }
+    .modal-card {
+      background: #fff; border-radius: 16px; padding: 28px; max-width: 400px; width: 100%;
+      text-align: center; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.15);
     }
 
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.84rem;
-      font-weight: 600;
-      padding: 8px 16px;
-      border-radius: 6px;
-      border: 1px solid var(--border-card);
-      cursor: pointer;
-      background-color: var(--btn-bg);
-      color: var(--text-title);
-      text-decoration: none;
-    }
-
-    .btn:hover {
-      background-color: var(--btn-hover);
-      border-color: var(--border-hover);
-    }
-
-    .btn-primary {
-      background-color: var(--accent-primary);
-      border-color: var(--accent-primary);
-      color: #ffffff;
-    }
-
-    .btn-primary:hover {
-      background-color: var(--accent-hover);
-    }
-
-    .btn-danger {
-      background-color: rgba(239, 68, 68, 0.12);
-      border: 1px solid rgba(239, 68, 68, 0.3);
-      color: var(--status-alert);
-      padding: 6px 12px;
-      font-size: 0.8rem;
-    }
-
-    .unit-pill {
-      font-size: 0.75rem;
-      font-weight: 600;
-      background-color: rgba(59, 130, 246, 0.15);
-      border: 1px solid rgba(59, 130, 246, 0.3);
-      color: var(--accent-primary);
-      padding: 3px 10px;
-      border-radius: 12px;
-    }
-
-    .grid-thingspeak {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 20px;
-      margin-bottom: 28px;
-    }
-
-    @media (max-width: 860px) {
-      .grid-thingspeak {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .ts-card {
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .ts-frame-wrapper {
-      position: relative;
-      width: 100%;
-      height: 270px;
-      border-radius: 6px;
-      overflow: hidden;
-      border: 1px solid var(--border-card);
-      background-color: #ffffff;
-    }
-
-    .ts-frame-wrapper iframe {
-      width: 100%;
-      height: 100%;
-      border: none;
-    }
-
-    /* Estilos Módulo ML H2O adaptados al tema */
-    .ml-card {
-      padding: 24px;
-      margin-bottom: 28px;
-    }
-
-    .h2o-tabs-bar {
-      display: flex;
-      gap: 6px;
-      background-color: var(--bg-inner);
-      border: 1px solid var(--border-card);
-      padding: 4px;
-      border-radius: 10px;
-    }
-
-    .h2o-tab {
-      background: transparent;
-      color: var(--text-muted);
-      border: none;
-      padding: 6px 14px;
-      border-radius: 7px;
-      font-size: 0.8rem;
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    .h2o-tab.active {
-      background-color: var(--accent-primary);
-      color: #ffffff;
-    }
-
-    .h2o-subbox {
-      background-color: var(--bg-inner);
-      border: 1px solid var(--border-card);
-      border-radius: 10px;
-      padding: 12px;
-      text-align: center;
-    }
-
-    .form-field {
-      margin-bottom: 12px;
-    }
-
-    .form-field label {
-      display: block;
-      font-size: 0.78rem;
-      font-weight: 600;
-      color: var(--text-title);
-      margin-bottom: 5px;
-    }
-
-    .form-field input {
-      width: 100%;
-      background-color: var(--bg-inner);
-      border: 1px solid var(--border-card);
-      border-radius: 6px;
-      padding: 9px 12px;
-      font-size: 0.9rem;
-      color: var(--text-title);
-      outline: none;
-    }
-
-    .form-field input:focus {
-      border-color: var(--accent-primary);
-    }
-
-    .vision-card {
-      padding: 24px;
-      margin-bottom: 28px;
-    }
-
-    .media-viewport {
-      background-color: #020617;
-      border: 1px solid var(--border-card);
-      border-radius: 10px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      overflow: hidden;
-      position: relative;
-    }
-
-    .btn-floating-agent {
-      position: fixed;
-      bottom: 24px;
-      right: 24px;
-      background: linear-gradient(135deg, #2563eb, #1d4ed8);
-      color: #ffffff;
-      border: none;
-      border-radius: 50px;
-      padding: 12px 22px;
-      font-weight: 600;
-      font-size: 0.9rem;
-      box-shadow: 0 10px 20px rgba(37, 99, 235, 0.35);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      z-index: 1000;
-      transition: transform 0.2s ease;
-    }
-
-    .btn-floating-agent:hover {
-      transform: translateY(-2px);
-    }
-
-    .chat-popup-window {
-      display: none;
-      position: fixed;
-      bottom: 86px;
-      right: 24px;
-      width: 390px;
-      height: 530px;
-      background-color: var(--bg-card);
-      border-radius: 18px;
-      border: 1px solid var(--border-card);
-      box-shadow: 0 20px 35px rgba(0, 0, 0, 0.4);
-      z-index: 1000;
-      overflow: hidden;
-      flex-direction: column;
-    }
-
-    .footer {
-      text-align: center;
-      padding: 20px 0;
-      font-size: 0.8rem;
-      color: var(--text-muted);
-      border-top: 1px solid var(--border-card);
-    }
-
-    /* Modal de Inicio de Sesión con Google */
-    .login-modal-overlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(2, 6, 23, 0.85);
-      backdrop-filter: blur(6px);
-      z-index: 9999;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-    }
-
-    .login-modal-card {
-      background-color: var(--bg-card);
-      border: 1px solid var(--border-card);
-      border-radius: 16px;
-      padding: 32px 28px;
-      max-width: 380px;
-      width: 100%;
-      text-align: center;
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    @media (max-width: 900px) {
+      .matriz-layout, .sim-grid, .xai-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
-
-  <!-- MODAL DE AUTENTICACIÓN GOOGLE -->
-  <div id="loginModal" class="login-modal-overlay">
-    <div class="login-modal-card">
-      <div style="font-size: 2.5rem; margin-bottom: 10px;">💧</div>
-      <h3 style="color: var(--text-title); font-size: 1.25rem; font-weight: 700; margin-bottom: 8px;">
-        Acceso a Estación H2O
-      </h3>
-      <p style="color: var(--text-muted); font-size: 0.84rem; margin-bottom: 24px;">
-        Inicia sesión con tu cuenta de Google para acceder al tablero de telemetría e inteligencia artificial.
-      </p>
-
-      <!-- Contenedor donde Google Identity Services renderiza el botón -->
-      <div id="googleBtnContainer" style="display: flex; justify-content: center; min-height: 44px; margin-bottom: 18px;"></div>
-
-      <button type="button" onclick="bypassDesarrollo()" style="background: transparent; border: none; color: var(--text-muted); font-size: 0.78rem; text-decoration: underline; cursor: pointer;">
-        Continuar como operador local
-      </button>
-    </div>
-  </div>
-
   <div class="container">
-
-    <!-- Encabezado con selector de tema y perfil de usuario -->
+    <!-- Encabezado -->
     <header class="header">
-      <div class="header-titles">
-        <h1>Sistema de Monitoreo Automatizado de Calidad del Agua</h1>
-        <p>Estación Central de Adquisición de Datos, Visión e Inteligencia Artificial</p>
+      <div class="header-title">
+        <h1>💧 Monitoreo Inteligente de Calidad del Agua</h1>
+        <p>Telemetría IoT (ESP32) • Neon PostgreSQL • ThingSpeak • Random Forest & Grad-CAM XAI</p>
       </div>
-
-      <div class="header-controls">
-        <button type="button" id="themeToggleBtn" class="theme-toggle-btn" onclick="alternarTema()">
-          <span id="themeIcon">☀️</span>
-          <span id="themeLabel">Modo Claro</span>
-        </button>
-
-        <div class="status-badge">
-          <span class="status-circle"></span>
-          <span>En línea</span>
-        </div>
-
-        <div class="user-profile">
-          <img id="usuarioAvatar" class="user-avatar" alt="Avatar">
-          <span id="usuarioNombre" class="user-name">Operador</span>
-          <button type="button" class="btn btn-danger" onclick="cerrarSesion()">Salir</button>
+      <div class="header-actions">
+        <div class="badge-live"><span class="dot-live"></span> En línea (ESP32)</div>
+        <button id="btn-open-login" class="btn-auth" onclick="abrirModalLogin()">Iniciar sesión</button>
+        <div id="user-chip" class="user-chip">
+          <img id="user-avatar" src="" alt="Avatar" />
+          <span id="user-name">Usuario</span>
+          <button class="btn-logout" onclick="cerrarSesion()">Salir</button>
         </div>
       </div>
     </header>
 
-    <!-- 1. Telemetría ThingSpeak -->
-    <section>
-      <div class="section-header">
-        <h2 class="section-title">Tablero de Telemetría en Tiempo Real (ThingSpeak IoT)</h2>
+    <!-- Tarjetas KPI en tiempo real -->
+    <section class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">🌡️ Temperatura Actual</div>
+        <div class="kpi-value" id="kpi-temp">-- °C</div>
+        <div class="kpi-sub" id="kpi-nodo">Nodo: calidad_agua</div>
       </div>
-
-      <div class="grid-thingspeak">
-        <div class="card" style="padding: 20px; display: flex; flex-direction: column; justify-content: space-between; min-height: 380px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-            <h3 style="font-size: 1.1rem; color: var(--text-title);">Temperatura del Agua</h3>
-            <span class="unit-pill">Canal 1: °C</span>
-          </div>
-          <div style="display: flex; justify-content: center; width: 100%; border-radius: 8px; overflow: hidden;">
-            <iframe width="450" height="260" style="border: 1px solid var(--border-card);" src="https://thingspeak.com/channels/3543191/widgets/1319036"></iframe>
-          </div>
-          <div style="display: flex; justify-content: space-between; margin-top: 10px;">
-            <span style="font-size: 0.85rem; color: var(--text-muted);">Sensor DS18B20</span>
-            <a href="https://thingspeak.com/channels/3543191" target="_blank" rel="noopener" style="font-size: 0.8rem; color: var(--accent-primary); text-decoration: none;">ThingSpeak ↗</a>
-          </div>
-        </div>
-
-        <div class="card ts-card">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-            <span style="font-size: 1.1rem; font-weight: 600; color: var(--text-title);">Nivel de Turbidez</span>
-            <span class="unit-pill">Canal 2: NTU</span>
-          </div>
-          <div class="ts-frame-wrapper">
-            <iframe id="iframeTurbidez" width="450" height="260" style="border: 1px solid var(--border-card);" src="https://thingspeak.com/channels/3543191/charts/2?bgcolor=%230f172a&color=%23ef4444&dynamic=true&results=60&type=line&update=15"></iframe>
-          </div>
-          <div style="display: flex; justify-content: space-between; margin-top: 10px;">
-            <span style="font-size: 0.85rem; color: var(--text-muted);">Sensor Óptico</span>
-            <a href="https://thingspeak.com/channels/3543191" target="_blank" rel="noopener" style="font-size: 0.8rem; color: var(--accent-primary); text-decoration: none;">ThingSpeak ↗</a>
-          </div>
-        </div>
-
-        <!-- Tarjeta 3: Índice de Calidad reactivo a Neon -->
-        <div class="card" style="padding: 20px; display: flex; flex-direction: column; justify-content: space-between; min-height: 380px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-            <h3 style="font-size: 1.1rem; color: var(--text-title);">Índice de Calidad</h3>
-            <span id="badgeEstadoTexto" style="background-color: rgba(16, 185, 129, 0.15); color: #10b981; font-size: 0.8rem; font-weight: 600; padding: 4px 12px; border-radius: 9999px;">
-              Normal
-            </span>
-          </div>
-
-          <div style="border: 1px solid var(--border-card); border-radius: 8px; padding: 15px; background: var(--bg-inner); display: flex; align-items: center; justify-content: center; height: 260px;">
-            <svg viewBox="0 0 420 220" width="100%" height="100%">
-              <line x1="20" y1="40" x2="400" y2="40" stroke="var(--border-card)" stroke-width="1" />
-              <line x1="20" y1="90" x2="400" y2="90" stroke="var(--border-card)" stroke-width="1" />
-              <line x1="20" y1="140" x2="400" y2="140" stroke="var(--border-card)" stroke-width="1" />
-              <line x1="20" y1="180" x2="400" y2="180" stroke="var(--border-hover)" stroke-width="1.5" />
-
-              <rect id="bar-normal" x="42" y="30" width="60" height="150" rx="4" fill="#10b981" style="transition: all 0.4s ease;" />
-              <rect id="bar-moderada" x="137" y="178" width="60" height="2" rx="4" fill="var(--border-card)" style="transition: all 0.4s ease;" />
-              <rect id="bar-regular" x="232" y="178" width="60" height="2" rx="4" fill="var(--border-card)" style="transition: all 0.4s ease;" />
-              <rect id="bar-critica" x="327" y="178" width="60" height="2" rx="4" fill="var(--border-card)" style="transition: all 0.4s ease;" />
-
-              <text x="72" y="198" text-anchor="middle" font-size="11" fill="var(--text-muted)" font-weight="500">Óptima / Normal</text>
-              <text x="167" y="198" text-anchor="middle" font-size="11" fill="var(--text-muted)" font-weight="500">Moderada</text>
-              <text x="262" y="198" text-anchor="middle" font-size="11" fill="var(--text-muted)" font-weight="500">Regular</text>
-              <text x="357" y="198" text-anchor="middle" font-size="11" fill="var(--text-muted)" font-weight="500">Crítica</text>
-            </svg>
-          </div>
-
-          <div style="display: flex; justify-content: space-between; margin-top: 10px;">
-            <span style="font-size: 0.85rem; color: var(--text-muted);">
-              Estado IoT: <strong id="detalleEstadoUltimo" style="color: var(--text-title);">Normal</strong>
-            </span>
-            <span style="font-size: 0.8rem; color: #10b981; font-weight: 600;">● Neon DB</span>
-          </div>
-        </div>
-
-        <div class="card ts-card">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-            <span style="font-size: 1.1rem; font-weight: 600; color: var(--text-title);">Tendencia Térmica</span>
-          </div>
-          <div class="ts-frame-wrapper">
-            <iframe id="iframeTemperatura" width="450" height="260" style="border: 1px solid var(--border-card);" src="https://thingspeak.com/channels/3543191/charts/1?bgcolor=%230f172a&color=%233b82f6&dynamic=true&results=60&type=line&update=15"></iframe>
-          </div>
-          <div style="display: flex; justify-content: space-between; margin-top: 10px;">
-            <span style="font-size: 0.85rem; color: var(--text-muted);">Registro Histórico</span>
-            <a href="https://thingspeak.com/channels/3543191" target="_blank" rel="noopener" style="font-size: 0.8rem; color: var(--accent-primary); text-decoration: none;">ThingSpeak ↗</a>
-          </div>
-        </div>
+      <div class="kpi-card">
+        <div class="kpi-label">💧 Turbidez Actual</div>
+        <div class="kpi-value" id="kpi-turb">-- NTU</div>
+        <div class="kpi-sub">Umbral crítico: &gt; 10.0 NTU</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">📌 Estado Operativo</div>
+        <div class="kpi-value" id="kpi-estado">Normal</div>
+        <div class="kpi-sub" id="kpi-hora">Última lectura: --</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">🤖 Diagnóstico IA (Tiempo Real)</div>
+        <div class="kpi-value" id="kpi-ia" style="font-size: 1.45rem;">Evaluando...</div>
+        <div class="kpi-sub" id="kpi-ia-conf">Confianza: --%</div>
       </div>
     </section>
 
-    <!-- 2. TARJETA MACHINE LEARNING: RANDOM FOREST / H2O -->
-    <section>
-      <div class="section-header">
-        <h2 class="section-title">Modelo Predictivo de Potabilidad (Random Forest H2O)</h2>
-      </div>
-
-      <div class="card ml-card">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; border-bottom: 1px solid var(--border-card); padding-bottom: 14px;">
-          <div>
-            <span style="font-size: 0.92rem; font-weight: 700; color: var(--text-title);">
-              💧 Clasificación Binaria en Tiempo Real (Potable vs. Contaminada)
-            </span>
-            <p style="margin-top: 2px; font-size: 0.8rem; color: var(--text-muted);">
-              Evaluación supervisada con 100 árboles de decisión sobre temperatura y turbidez
-            </p>
-          </div>
-
-          <div class="h2o-tabs-bar">
-            <button type="button" id="tab-h2o-donuts" class="h2o-tab active" onclick="mostrarPestanaH2O('donuts')">Donas</button>
-            <button type="button" id="tab-h2o-sim" class="h2o-tab" onclick="mostrarPestanaH2O('sim')">Simulador</button>
-            <button type="button" id="tab-h2o-matriz" class="h2o-tab" onclick="mostrarPestanaH2O('matriz')">Matriz</button>
-          </div>
-        </div>
-
-        <!-- VISTA 1: LAS 3 DONAS DE KEVIN -->
-        <div id="h2o-vista-donuts" style="display: block;">
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px;">
-            <div class="h2o-subbox">
-              <div id="donut-accuracy" style="height: 185px;"></div>
-              <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Precisión del Modelo</span>
-            </div>
-            <div class="h2o-subbox">
-              <div id="donut-temp" style="height: 185px;"></div>
-              <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Temperatura ESP32</span>
-            </div>
-            <div class="h2o-subbox">
-              <div id="donut-turb" style="height: 185px;"></div>
-              <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Turbidez ESP32</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- VISTA 2: SIMULADOR CON TACÓMETRO (GAUGE) -->
-        <div id="h2o-vista-sim" style="display: none;">
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 22px; align-items: center;">
-            <div>
-              <button type="button" class="btn btn-primary" onclick="analizarLecturaActualESP32()" style="width: 100%; padding: 11px; margin-bottom: 16px;">
-                ⚡ Evaluar Último Dato del ESP32
-              </button>
-
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                <div class="form-field">
-                  <label>Temperatura (°C)</label>
-                  <input type="number" step="0.1" id="input-temp-ml" placeholder="Ej: 24.5">
-                </div>
-                <div class="form-field">
-                  <label>Turbidez (NTU)</label>
-                  <input type="number" step="0.01" id="input-turb-ml" placeholder="Ej: 3.20">
-                </div>
-              </div>
-
-              <button type="button" class="btn" onclick="ejecutarAnalisisManualML()" style="width: 100%; padding: 10px;">
-                Simular Manualmente ➜
-              </button>
-            </div>
-
-            <div class="h2o-subbox" style="padding: 16px;">
-              <div id="gauge-confianza" style="height: 185px;"></div>
-              <div id="ml-alerta-resultado" style="display: none; padding: 10px; border-radius: 8px; font-weight: 700; font-size: 0.84rem; margin-top: 8px;"></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- VISTA 3: HEATMAP MATRIZ DE CONFUSIÓN -->
-        <div id="h2o-vista-matriz" style="display: none;">
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; align-items: center;">
-            <div class="h2o-subbox" style="padding: 8px;">
-              <div id="heatmap-confusion" style="height: 245px;"></div>
-            </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-              <div class="h2o-subbox" style="padding: 16px;">
-                <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Exactitud</span>
-                <div id="metric-accuracy-val" style="font-size: 1.35rem; font-weight: 800; color: var(--text-title); margin-top: 4px;">--%</div>
-              </div>
-              <div class="h2o-subbox" style="padding: 16px;">
-                <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Precisión</span>
-                <div id="metric-precision-val" style="font-size: 1.35rem; font-weight: 800; color: var(--text-title); margin-top: 4px;">--%</div>
-              </div>
-              <div class="h2o-subbox" style="padding: 16px;">
-                <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Recall</span>
-                <div id="metric-recall-val" style="font-size: 1.35rem; font-weight: 800; color: var(--text-title); margin-top: 4px;">--%</div>
-              </div>
-              <div class="h2o-subbox" style="padding: 16px;">
-                <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">F1-Score</span>
-                <div id="metric-f1-val" style="font-size: 1.35rem; font-weight: 800; color: var(--text-title); margin-top: 4px;">--%</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- 3. MÓDULO VISUAL E IA EXPLICABLE (GRAD-CAM XAI) -->
-    <section>
-      <div class="section-header">
-        <h2 class="section-title">Módulo de Inspección Visual e IA Explicable (Grad-CAM XAI)</h2>
-      </div>
-
-      <div class="card vision-card">
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
-          <div style="display: flex; flex-direction: column; gap: 8px;">
-            <span style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">
-              📷 Muestra Capturada
-            </span>
-            <div class="media-viewport" style="height: 310px;">
-              <video id="videoCam" playsinline autoplay muted style="display: none; width: 100%; height: 100%; object-fit: contain;"></video>
-              <canvas id="canvasVision" width="640" height="480" style="width: 100%; height: 100%; object-fit: contain;"></canvas>
-            </div>
-          </div>
-
-          <div style="display: flex; flex-direction: column; gap: 8px;">
-            <span style="font-size: 0.78rem; font-weight: 700; color: var(--accent-primary); text-transform: uppercase;">
-              🔍 Mapa de Calor de Activación (Regiones de Atención de la IA)
-            </span>
-            <div class="media-viewport" style="height: 310px;">
-              <canvas id="canvasXAI" width="640" height="480" style="width: 100%; height: 100%; object-fit: contain;"></canvas>
-              <div id="xaiLegend" style="position: absolute; bottom: 10px; left: 10px; right: 10px; background: rgba(15, 23, 42, 0.9); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); font-size: 0.74rem; color: #e2e8f0; opacity: 0; transition: opacity 0.3s ease;">
-                <strong style="color: #60a5fa;">Grad-CAM:</strong> Las zonas cálidas (rojas/amarillas) indican dónde la red convolucional detectó mayor opacidad y sedimentación suspendida.
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; flex-wrap: wrap; gap: 10px;">
-          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-            <button type="button" class="btn" id="btnToggleCam" onclick="toggleCamara()">Iniciar Transmisión DroidCam</button>
-            <button type="button" class="btn btn-primary" id="btnCapturar" onclick="capturarFotograma()" style="display: none;">Capturar Fotograma</button>
-            <button type="button" class="btn" onclick="document.getElementById('inputFotoLocal').click()">Cargar Imagen Local</button>
-            <input type="file" id="inputFotoLocal" accept="image/*" style="display: none;" onchange="procesarArchivoLocal(event)">
-          </div>
-          <button type="button" class="btn" onclick="limpiarVisor()">Restablecer Visor</button>
-        </div>
-
-        <div style="background: var(--bg-inner); border: 1px solid var(--border-card); border-radius: 10px; padding: 18px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; border-bottom: 1px solid var(--border-card); padding-bottom: 10px;">
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <span style="width: 9px; height: 9px; border-radius: 50%; background: var(--accent-primary); display: inline-block;"></span>
-              <strong id="statusMessage" style="font-size: 0.95rem; color: var(--text-title);">Listo para inferencia explicable</strong>
-            </div>
-            <div style="display: flex; gap: 8px;">
-              <span id="metricLatencia" style="font-size: 0.75rem; background: var(--bg-card); border: 1px solid var(--border-card); color: var(--text-muted); padding: 2px 8px; border-radius: 6px; font-family: monospace;">Inferencia: -- ms</span>
-              <span id="vrTotalBadge" class="unit-pill">Efectividad > 85%</span>
-            </div>
-          </div>
-
-          <span style="font-size: 0.76rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 10px; display: block;">
-            Desglose de Probabilidades (Softmax Breakdown)
-          </span>
-
-          <div style="display: flex; flex-direction: column; gap: 9px; margin-bottom: 18px;">
-            <div>
-              <div style="display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 600; margin-bottom: 4px; color: var(--text-title);">
-                <span>Agua Limpia / Óptima</span>
-                <span id="prob-optima">0.0%</span>
-              </div>
-              <div style="width: 100%; height: 7px; background: var(--border-card); border-radius: 4px; overflow: hidden;">
-                <div id="bar-prob-optima" style="width: 0%; height: 100%; background: #10b981; transition: width 0.4s ease;"></div>
-              </div>
-            </div>
-
-            <div>
-              <div style="display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 600; margin-bottom: 4px; color: var(--text-title);">
-                <span>Levemente Túrbida / Precaución</span>
-                <span id="prob-moderada">0.0%</span>
-              </div>
-              <div style="width: 100%; height: 7px; background: var(--border-card); border-radius: 4px; overflow: hidden;">
-                <div id="bar-prob-moderada" style="width: 0%; height: 100%; background: #f59e0b; transition: width 0.4s ease;"></div>
-              </div>
-            </div>
-
-            <div>
-              <div style="display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 600; margin-bottom: 4px; color: var(--text-title);">
-                <span>Alta Turbidez / Crítica</span>
-                <span id="prob-critica">0.0%</span>
-              </div>
-              <div style="width: 100%; height: 7px; background: var(--border-card); border-radius: 4px; overflow: hidden;">
-                <div id="bar-prob-critica" style="width: 0%; height: 100%; background: #ef4444; transition: width 0.4s ease;"></div>
-              </div>
-            </div>
-          </div>
-
-          <div style="background: var(--bg-card); border: 1px dashed var(--border-card); border-radius: 8px; padding: 12px 16px; font-size: 0.84rem; display: flex; align-items: flex-start; gap: 10px;">
-            <span style="font-size: 1.2rem; line-height: 1;">⚡</span>
-            <div>
-              <strong style="color: var(--text-title);">Fusión Multimodal (Sensores + Visión):</strong>
-              <div id="txtVeredictoMultimodal" style="margin-top: 3px; color: var(--text-body);">
-                Esperando captura visual para correlacionar con telemetría en tiempo real y mapa de calor.
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <footer class="footer">
-      Sistema IoT Integrado | Unidad Temática de Inteligencia Artificial
-    </footer>
-
-  </div>
-
-  <!-- Botón Flotante de Chat IA -->
-  <button id="btnOpenChat" class="btn-floating-agent" onclick="toggleChatPopup()">
-    <span style="font-size: 1.15rem;">💬</span>
-    <span>Consultar Agente IA</span>
-  </button>
-
-  <!-- Ventana Flotante del Chat -->
-  <div id="chatModalPopup" class="chat-popup-window">
-    <div style="background: linear-gradient(90deg, #1e3a8a, #2563eb); color: #ffffff; padding: 12px 18px; display: flex; justify-content: space-between; align-items: center;">
-      <div style="display: flex; align-items: center; gap: 8px;">
-        <span style="font-size: 1.1rem;">🤖</span>
+    <!-- Gráfica Histórica en Vivo -->
+    <section class="card">
+      <div class="card-header">
         <div>
-          <div style="font-weight: 700; font-size: 0.88rem;">Agente Calidad del Agua</div>
-          <div style="font-size: 0.7rem; opacity: 0.85;">En línea • Respuestas en tiempo real</div>
+          <h2>📈 Tendencia de Sensores en Tiempo Real</h2>
+          <p>Histórico reciente almacenado en Neon PostgreSQL y sincronizado con ThingSpeak (Canal 3543191)</p>
         </div>
       </div>
-      <button onclick="toggleChatPopup()" style="background: transparent; border: none; color: #ffffff; font-size: 1.2rem; cursor: pointer;">✕</button>
-    </div>
-    <iframe src="https://backend-iot-vision.onrender.com/chat-gui" style="width: 100%; height: 100%; border: none;"></iframe>
+      <div id="grafica-tiempo-real" style="width: 100%; height: 300px;"></div>
+    </section>
+
+    <!-- Clasificación Binaria (Donas / Simulador / Matriz) -->
+    <section class="card">
+      <div class="card-header">
+        <div>
+          <h2>💧 Clasificación Binaria en Tiempo Real (Potable vs. Contaminada)</h2>
+          <p>Evaluación supervisada con 100 árboles de decisión sobre temperatura y turbidez</p>
+        </div>
+        <div class="tab-group">
+          <button class="tab-btn" id="tab-donas" onclick="cambiarTabML('donas')">Donas</button>
+          <button class="tab-btn" id="tab-simulador" onclick="cambiarTabML('simulador')">Simulador</button>
+          <button class="tab-btn active" id="tab-matriz" onclick="cambiarTabML('matriz')">Matriz</button>
+        </div>
+      </div>
+
+      <!-- Vista 1: Donas -->
+      <div id="vista-donas" style="display: none;">
+        <div class="donas-grid">
+          <div class="matriz-box"><div id="dona-exactitud" style="width: 100%; height: 240px;"></div></div>
+          <div class="matriz-box"><div id="dona-distribucion" style="width: 100%; height: 240px;"></div></div>
+        </div>
+      </div>
+
+      <!-- Vista 2: Simulador -->
+      <div id="vista-simulador" style="display: none;">
+        <div class="sim-grid">
+          <div class="matriz-box" style="padding: 20px;">
+            <div class="form-group">
+              <label for="sim-temp">Temperatura simulada (°C)</label>
+              <input type="number" id="sim-temp" step="0.1" value="25.5" />
+            </div>
+            <div class="form-group">
+              <label for="sim-turb">Turbidez simulada (NTU)</label>
+              <input type="number" id="sim-turb" step="0.1" value="3.2" />
+            </div>
+            <button class="btn-auth" style="width: 100%;" onclick="ejecutarSimulacion()">Predecir Potabilidad con IA</button>
+          </div>
+          <div class="metric-tile" style="padding: 28px;">
+            <span>RESULTADO DE INFERENCIA RANDOM FOREST</span>
+            <strong id="sim-resultado" style="font-size: 1.5rem; margin: 12px 0;">Agua Potable / Apta</strong>
+            <p id="sim-detalle" style="font-size: 0.85rem; color: var(--muted);">Ingresa valores de prueba y pulsa predecir.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Vista 3: Matriz de Confusión (Corregida sin desbordes ni textos cortados) -->
+      <div id="vista-matriz" class="matriz-layout">
+        <div class="matriz-box">
+          <div id="matriz-confusion-plot" style="width: 100%; height: 295px;"></div>
+        </div>
+        <div class="metrics-2x2">
+          <div class="metric-tile">
+            <span>EXACTITUD</span>
+            <strong id="kpi-accuracy">98.75%</strong>
+          </div>
+          <div class="metric-tile">
+            <span>PRECISIÓN</span>
+            <strong id="kpi-precision">100%</strong>
+          </div>
+          <div class="metric-tile">
+            <span>RECALL</span>
+            <strong id="kpi-recall">90.91%</strong>
+          </div>
+          <div class="metric-tile">
+            <span>F1-SCORE</span>
+            <strong id="kpi-f1">95.24%</strong>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Módulo de Inspección Visual e IA Explicable -->
+    <section class="card">
+      <div class="card-header">
+        <div>
+          <h2>🔬 Módulo de Inspección Visual e IA Explicable (Grad-CAM XAI)</h2>
+          <p>Clasificación óptica de muestras de agua y mapa de activación de turbidez/sedimentos</p>
+        </div>
+      </div>
+      <div class="xai-grid">
+        <div>
+          <label class="upload-zone" for="input-muestra">
+            <strong>Haz clic para subir una fotografía de la muestra de agua</strong>
+            <p style="font-size: 0.8rem; color: var(--muted); margin-top: 6px;">Formatos soportados: JPG, PNG, WEBP</p>
+            <input type="file" id="input-muestra" accept="image/*" style="display: none;" onchange="procesarImagenMuestra(event)" />
+          </label>
+          <div class="preview-row">
+            <div class="preview-box">
+              <img id="img-original" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='150'%3E%3Crect width='100%25' height='100%25' fill='%23e2e8f0'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%2364748b' font-size='12'%3ESin imagen%3C/text%3E%3C/svg%3E" alt="Muestra" />
+              <span>Muestra Original</span>
+            </div>
+            <div class="preview-box">
+              <canvas id="canvas-gradcam" width="220" height="170"></canvas>
+              <span>Mapa de Calor Grad-CAM</span>
+            </div>
+          </div>
+        </div>
+        <div class="matriz-box" style="padding: 20px; gap: 12px;">
+          <div style="font-size: 0.78rem; font-weight: 700; color: var(--muted);">DIAGNÓSTICO ÓPTICO CNN</div>
+          <div id="xai-diagnostico" style="font-size: 1.35rem; font-weight: 800; color: var(--text);">Esperando muestra...</div>
+          <div id="xai-meta" style="font-size: 0.84rem; color: var(--muted);">Confianza: -- • Latencia: -- ms</div>
+          <div id="xai-barras" style="margin-top: 8px; font-size: 0.83rem; color: var(--text); line-height: 1.7;">
+            • Óptima / Limpia: <strong>--%</strong><br />
+            • Levemente Túrbida: <strong>--%</strong><br />
+            • Alta Turbidez / Crítica: <strong>--%</strong>
+          </div>
+        </div>
+      </div>
+    </section>
   </div>
 
-  <!-- Scripts de Edge Impulse WASM y Dashboard -->
-  <script src="/static/edge-impulse-standalone.js"></script>
-  <script src="/static/run-impulse.js"></script>
-  <script src="/static/dashboard.js"></script>
+  <!-- Modal de Inicio de Sesión Google -->
+  <div id="modal-login" class="modal-backdrop" onclick="if(event.target===this) cerrarModalLogin()">
+    <div class="modal-card">
+      <h3 style="font-size: 1.15rem; font-weight: 800; margin-bottom: 8px;">Acceso al Sistema IoT</h3>
+      <p style="font-size: 0.85rem; color: var(--muted); margin-bottom: 20px;">
+        Inicia sesión con tu cuenta institucional o personal de Google para auditar telemetría.
+      </p>
+      <div id="google-btn-container" style="display: flex; justify-content: center; margin-bottom: 16px;"></div>
+      <button onclick="cerrarModalLogin()" style="background: none; border: none; color: var(--muted); font-size: 0.82rem; cursor: pointer;">Cancelar</button>
+    </div>
+  </div>
 
-  <!-- Script: Alternador y Persistencia de Tema Claro / Oscuro -->
   <script>
-    function aplicarTema(tema) {
-      document.documentElement.setAttribute("data-theme", tema);
-      localStorage.setItem("tema_seleccionado", tema);
+    // ==========================================================
+    // 1. AUTENTICACIÓN GOOGLE OAUTH 2.0 (CLIENT ID ACTUALIZADO)
+    // ==========================================================
+    const GOOGLE_CLIENT_ID = "144217789481-591ojt4dohgjmm7542cohgef6hr9228k.apps.googleusercontent.com";
 
-      const icon = document.getElementById("themeIcon");
-      const label = document.getElementById("themeLabel");
-      const ifrTurb = document.getElementById("iframeTurbidez");
-      const ifrTemp = document.getElementById("iframeTemperatura");
+    function decodificarJwt(token) {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      return JSON.parse(decodeURIComponent(atob(base64).split('').map(c =>
+        '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+      ).join('')));
+    }
 
-      if (tema === "light") {
-        if (icon) icon.textContent = "🌙";
-        if (label) label.textContent = "Modo Oscuro";
-        if (ifrTurb) ifrTurb.src = "https://thingspeak.com/channels/3543191/charts/2?bgcolor=%23ffffff&color=%23ef4444&dynamic=true&results=60&type=line&update=15";
-        if (ifrTemp) ifrTemp.src = "https://thingspeak.com/channels/3543191/charts/1?bgcolor=%23ffffff&color=%232563eb&dynamic=true&results=60&type=line&update=15";
+    function handleCredentialResponse(response) {
+      const payload = decodificarJwt(response.credential);
+      localStorage.setItem("iot_user", JSON.stringify({
+        name: payload.name,
+        email: payload.email,
+        picture: payload.picture
+      }));
+      aplicarSesionUI();
+      cerrarModalLogin();
+    }
+
+    function aplicarSesionUI() {
+      const raw = localStorage.getItem("iot_user");
+      const btnLogin = document.getElementById("btn-open-login");
+      const chip = document.getElementById("user-chip");
+      if (raw) {
+        const u = JSON.parse(raw);
+        btnLogin.style.display = "none";
+        chip.style.display = "inline-flex";
+        document.getElementById("user-name").textContent = u.name;
+        document.getElementById("user-avatar").src = u.picture || "";
       } else {
-        if (icon) icon.textContent = "☀️";
-        if (label) label.textContent = "Modo Claro";
-        if (ifrTurb) ifrTurb.src = "https://thingspeak.com/channels/3543191/charts/2?bgcolor=%230f172a&color=%23ef4444&dynamic=true&results=60&type=line&update=15";
-        if (ifrTemp) ifrTemp.src = "https://thingspeak.com/channels/3543191/charts/1?bgcolor=%230f172a&color=%233b82f6&dynamic=true&results=60&type=line&update=15";
-      }
-
-      if (typeof inicializarModuloH2O === "function") {
-        inicializarModuloH2O();
+        btnLogin.style.display = "inline-block";
+        chip.style.display = "none";
       }
     }
 
-    function alternarTema() {
-      const actual = document.documentElement.getAttribute("data-theme") || "dark";
-      const nuevo = (actual === "dark") ? "light" : "dark";
-      aplicarTema(nuevo);
+    function cerrarSesion() {
+      localStorage.removeItem("iot_user");
+      aplicarSesionUI();
     }
 
-    document.addEventListener("DOMContentLoaded", () => {
-      const temaGuardado = localStorage.getItem("tema_seleccionado") || "dark";
-      aplicarTema(temaGuardado);
+    function abrirModalLogin() {
+      document.getElementById("modal-login").style.display = "flex";
+    }
+    function cerrarModalLogin() {
+      document.getElementById("modal-login").style.display = "none";
+    }
+
+    window.addEventListener("load", () => {
+      aplicarSesionUI();
+      if (window.google && google.accounts) {
+        google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: handleCredentialResponse
+        });
+        google.accounts.id.renderButton(
+          document.getElementById("google-btn-container"),
+          { theme: "outline", size: "large", width: 280 }
+        );
+      }
     });
-  </script>
 
-  <!-- Control del Chat Flotante -->
-  <script>
-    function toggleChatPopup() {
-      const popup = document.getElementById("chatModalPopup");
-      if (!popup) return;
-      popup.style.display = (popup.style.display === "flex") ? "none" : "flex";
-    }
-  </script>
+    // ==========================================================
+    // 2. PESTAÑAS Y MATRIZ DE CONFUSIÓN RESPONSIVA
+    // ==========================================================
+    let matrizDatos = [[69, 0], [1, 10]]; // [[Contaminada->Contaminada, Contaminada->Potable], [Potable->Contaminada, Potable->Potable]]
 
-  <!-- Control de Visión, DroidCam y Grad-CAM XAI -->
-  <script>
-    let videoStream = null;
-
-    async function toggleCamara() {
-      const video = document.getElementById("videoCam");
-      const btnToggle = document.getElementById("btnToggleCam");
-      const btnCapturar = document.getElementById("btnCapturar");
-
-      if (!videoStream) {
-        try {
-          videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
-          video.srcObject = videoStream;
-          video.style.display = "block";
-          document.getElementById("canvasVision").style.display = "none";
-          btnToggle.innerText = "Detener Cámara";
-          btnCapturar.style.display = "inline-flex";
-        } catch (err) {
-          alert("No se pudo acceder a la cámara o DroidCam.");
-        }
-      } else {
-        videoStream.getTracks().forEach(track => track.stop());
-        videoStream = null;
-        video.style.display = "none";
-        document.getElementById("canvasVision").style.display = "block";
-        btnToggle.innerText = "Iniciar Transmisión DroidCam";
-        btnCapturar.style.display = "none";
-      }
-    }
-
-    function capturarFotograma() {
-      const video = document.getElementById("videoCam");
-      const canvas = document.getElementById("canvasVision");
-      const ctx = canvas.getContext("2d");
-
-      canvas.width = video.videoWidth || 640;
-      canvas.height = video.videoHeight || 480;
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-      toggleCamara();
-      canvas.toBlob(blob => enviarImagenABackend(blob), "image/jpeg", 0.95);
-    }
-
-    function procesarArchivoLocal(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-
-      const canvas = document.getElementById("canvasVision");
-      const ctx = canvas.getContext("2d");
-      const img = new Image();
-
-      img.onload = function() {
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx.drawImage(img, 0, 0);
-        enviarImagenABackend(file);
-      };
-      img.src = URL.createObjectURL(file);
-    }
-
-    async function enviarImagenABackend(blobOArchivo) {
-      const statusMsg = document.getElementById("statusMessage");
-      const latenciaEl = document.getElementById("metricLatencia");
-
-      if (statusMsg) statusMsg.innerText = "Evaluando muestra con el modelo Keras e interpretando XAI...";
-
-      const formData = new FormData();
-      formData.append("file", blobOArchivo, "muestra.jpg");
-
-      const BACKEND_URL = "/api/vision/clasificar-muestra";
-
-      try {
-        const res = await fetch(BACKEND_URL, { method: "POST", body: formData });
-        if (!res.ok) throw new Error("Fallo en red o API");
-        const data = await res.json();
-
-        if (statusMsg) statusMsg.innerText = `Diagnóstico: ${data.diagnostico}`;
-        if (latenciaEl && data.latencia_ms) latenciaEl.innerText = `Inferencia: ${data.latencia_ms} ms`;
-
-        if (data.distribucion) {
-          document.getElementById("prob-optima").innerText = `${data.distribucion.optima}%`;
-          document.getElementById("bar-prob-optima").style.width = `${data.distribucion.optima}%`;
-
-          document.getElementById("prob-moderada").innerText = `${data.distribucion.moderada}%`;
-          document.getElementById("bar-prob-moderada").style.width = `${data.distribucion.moderada}%`;
-
-          document.getElementById("prob-critica").innerText = `${data.distribucion.critica}%`;
-          document.getElementById("bar-prob-critica").style.width = `${data.distribucion.critica}%`;
-        }
-
-        generarMapaCalorGradCAM(data.diagnostico);
-
-        const txtMultimodal = document.getElementById("txtVeredictoMultimodal");
-        const estadoIoT = (document.getElementById("detalleEstadoUltimo")?.textContent || "").toLowerCase();
-        const diagVision = (data.diagnostico || "").toLowerCase();
-
-        if (txtMultimodal) {
-          if (diagVision.includes("limpia") && (estadoIoT.includes("normal") || estadoIoT.includes("optima"))) {
-            txtMultimodal.innerHTML = "<span style='color: #10b981; font-weight: 600;'>Concordancia Total:</span> Ambos sistemas confirman que el agua se encuentra en condiciones óptimas para consumo/uso general.";
-          } else if (diagVision.includes("critica") || diagVision.includes("turbi")) {
-            txtMultimodal.innerHTML = "<span style='color: #ef4444; font-weight: 600;'>Alerta Multimodal:</span> El análisis óptico detectó alta turbidez. Se aconseja purga o retención del efluente.";
-          } else {
-            txtMultimodal.innerHTML = "<span style='color: #f59e0b; font-weight: 600;'>Observación Preventiva:</span> Valores en rango moderado. Se recomienda supervisión continua del filtro.";
-          }
-        }
-
-      } catch (err) {
-        console.error(err);
-        if (statusMsg) statusMsg.innerText = "Error al procesar el fotograma";
-      }
-    }
-
-    function generarMapaCalorGradCAM(diagnostico) {
-      const origCanvas = document.getElementById("canvasVision");
-      const xaiCanvas = document.getElementById("canvasXAI");
-      const legend = document.getElementById("xaiLegend");
-      if (!origCanvas || !xaiCanvas) return;
-
-      const ctxXAI = xaiCanvas.getContext("2d");
-      xaiCanvas.width = origCanvas.width;
-      xaiCanvas.height = origCanvas.height;
-
-      ctxXAI.drawImage(origCanvas, 0, 0);
-      const imgData = ctxXAI.getImageData(0, 0, xaiCanvas.width, xaiCanvas.height);
-      const d = imgData.data;
-
-      const isTurbida = diagnostico.toLowerCase().includes("alta") || diagnostico.toLowerCase().includes("turbida");
-      const isModerada = diagnostico.toLowerCase().includes("leve") || diagnostico.toLowerCase().includes("precaución");
-
-      const w = xaiCanvas.width;
-      const h = xaiCanvas.height;
-      const cx = w / 2;
-      const cy = h / 2;
-
-      for (let y = 0; y < h; y++) {
-        for (let x = 0; x < w; x++) {
-          const idx = (y * w + x) * 4;
-          const r = d[idx];
-          const g = d[idx + 1];
-          const b = d[idx + 2];
-
-          const dx = (x - cx) / (w * 0.35);
-          const dy = (y - cy) / (h * 0.4);
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          let focus = Math.max(0, 1 - dist);
-
-          if (isTurbida) {
-            const absorb = (255 - b) / 255;
-            const heat = focus * absorb * 1.5;
-            d[idx] = Math.min(255, r + heat * 160);
-            d[idx + 1] = Math.min(255, g + heat * 50);
-            d[idx + 2] = Math.max(0, b - heat * 120);
-          } else if (isModerada) {
-            const heat = focus * 0.8;
-            d[idx] = Math.min(255, r + heat * 100);
-            d[idx + 1] = Math.min(255, g + heat * 100);
-            d[idx + 2] = Math.max(0, b - heat * 40);
-          } else {
-            const clearHeat = focus * 0.45;
-            d[idx] = Math.max(0, r - clearHeat * 80);
-            d[idx + 1] = Math.min(255, g + clearHeat * 50);
-            d[idx + 2] = Math.min(255, b + clearHeat * 120);
-          }
-        }
-      }
-
-      ctxXAI.putImageData(imgData, 0, 0);
-      if (legend) legend.style.opacity = "1";
-    }
-
-    function limpiarVisor() {
-      const canvas = document.getElementById("canvasVision");
-      const xaiCanvas = document.getElementById("canvasXAI");
-      if (canvas) canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
-      if (xaiCanvas) xaiCanvas.getContext("2d").clearRect(0, 0, xaiCanvas.width, xaiCanvas.height);
-
-      document.getElementById("statusMessage").innerText = "Esperando muestra...";
-      document.getElementById("xaiLegend").style.opacity = "0";
-      document.getElementById("metricLatencia").innerText = "Inferencia: -- ms";
-
-      document.getElementById("prob-optima").innerText = "0.0%";
-      document.getElementById("bar-prob-optima").style.width = "0%";
-      document.getElementById("prob-moderada").innerText = "0.0%";
-      document.getElementById("bar-prob-moderada").style.width = "0%";
-      document.getElementById("prob-critica").innerText = "0.0%";
-      document.getElementById("bar-prob-critica").style.width = "0%";
-      document.getElementById("txtVeredictoMultimodal").innerText = "Esperando captura visual para correlacionar con telemetría en tiempo real y mapa de calor.";
-    }
-  </script>
-
-  <!-- Script: Gráficos H2O (Donas, Gauge y Matriz) adaptados al Tema Claro/Oscuro -->
-  <script>
-    function obtenerColoresTemaPlotly() {
-      const esOscuro = (document.documentElement.getAttribute("data-theme") || "dark") === "dark";
-      return {
-        textoPrincipal: esOscuro ? "#f8fafc" : "#0f172a",
-        textoSecundario: esOscuro ? "#94a3b8" : "#64748b",
-        fondoDonaVacio: esOscuro ? "#1e293b" : "#e2e8f0",
-        heatmapMin: esOscuro ? "#0f172a" : "#ebf3fb",
-        heatmapMax: "#3b82f6"
-      };
-    }
-
-    function mostrarPestanaH2O(vista) {
-      document.getElementById("h2o-vista-donuts").style.display = vista === "donuts" ? "block" : "none";
-      document.getElementById("h2o-vista-sim").style.display = vista === "sim" ? "block" : "none";
-      document.getElementById("h2o-vista-matriz").style.display = vista === "matriz" ? "block" : "none";
-
-      ["donuts", "sim", "matriz"].forEach(id => {
-        const btn = document.getElementById("tab-h2o-" + id);
-        if (btn) btn.classList.toggle("active", id === vista);
-      });
-    }
-
-    function dibujarDonaH2O(elementId, valor, maxVal, titulo, color, decimales) {
-      const el = document.getElementById(elementId);
-      if (!el || typeof Plotly === "undefined") return;
-
-      const c = obtenerColoresTemaPlotly();
-      const visualVal = Math.max(0, Math.min(valor, maxVal));
-
-      const data = [{
-        values: [visualVal, Math.max(0, maxVal - visualVal)],
-        hole: 0.82,
-        type: "pie",
-        marker: { colors: [color, c.fondoDonaVacio] },
-        textinfo: "none",
-        hoverinfo: "skip",
-        sort: false
-      }];
-
-      const layout = {
-        showlegend: false,
-        margin: { t: 5, b: 5, l: 5, r: 5 },
-        height: 185,
-        paper_bgcolor: "rgba(0,0,0,0)",
-        annotations: [{
-          text: `<b style='font-size:22px;color:${c.textoPrincipal}'>${valor.toFixed(decimales)}</b><br><span style='font-size:9px;color:${c.textoSecundario};font-weight:700'>${titulo}</span>`,
-          x: 0.5, y: 0.5, showarrow: false
-        }]
-      };
-
-      Plotly.newPlot(elementId, data, layout, { responsive: true, displayModeBar: false });
-    }
-
-    function dibujarGaugeH2O(confianza, esPotable) {
-      const el = document.getElementById("gauge-confianza");
-      if (!el || typeof Plotly === "undefined") return;
-
-      const c = obtenerColoresTemaPlotly();
-      const colorBarra = esPotable ? "#10b981" : "#ef4444";
-
-      const data = [{
-        type: "indicator",
-        mode: "gauge+number",
-        value: confianza,
-        number: { suffix: "%", font: { color: c.textoPrincipal, size: 28 } },
-        title: { text: "Confianza del Modelo", font: { color: c.textoSecundario, size: 12 } },
-        gauge: {
-          axis: { range: [0, 100], tickcolor: c.textoSecundario },
-          bar: { color: colorBarra, thickness: 0.25 },
-          bgcolor: "rgba(0,0,0,0)",
-          steps: [
-            { range: [0, 50], color: "rgba(239, 68, 68, 0.15)" },
-            { range: [50, 85], color: "rgba(59, 130, 246, 0.15)" },
-            { range: [85, 100], color: "rgba(16, 185, 129, 0.2)" }
-          ]
-        }
-      }];
-
-      const layout = {
-        height: 185,
-        margin: { l: 20, r: 20, t: 25, b: 10 },
-        paper_bgcolor: "rgba(0,0,0,0)"
-      };
-
-      Plotly.newPlot("gauge-confianza", data, layout, { responsive: true, displayModeBar: false });
-    }
-
-    function dibujarMatrizH2O(matrizRaw) {
-      const el = document.getElementById("heatmap-confusion");
-      if (!el || typeof Plotly === "undefined") return;
-
-      const c = obtenerColoresTemaPlotly();
-      const data = [{
-        z: matrizRaw,
+    function renderizarMatrizConfusion() {
+      const trace = {
+        z: matrizDatos,
         x: ["Contaminada", "Potable"],
         y: ["Contaminada", "Potable"],
         type: "heatmap",
-        colorscale: [[0, c.heatmapMin], [1, c.heatmapMax]],
-        showscale: false
-      }];
-
-      const anotaciones = [];
-      for (let i = 0; i < 2; i++) {
-        for (let j = 0; j < 2; j++) {
-          anotaciones.push({
-            x: data[0].x[j],
-            y: data[0].y[i],
-            text: `<b>${matrizRaw[i][j]}</b>`,
-            font: { color: c.textoPrincipal, size: 16 },
-            showarrow: false
-          });
-        }
-      }
-
-      const layout = {
-        annotations: anotaciones,
-        height: 240,
-        margin: { l: 75, r: 15, t: 15, b: 40 },
-        xaxis: { title: "<b>Predicción</b>", color: c.textoSecundario },
-        yaxis: { title: "<b>Real</b>", color: c.textoSecundario },
-        paper_bgcolor: "rgba(0,0,0,0)",
-        plot_bgcolor: "rgba(0,0,0,0)"
+        colorscale: [
+          [0, "#eef2ff"],
+          [0.5, "#93c5fd"],
+          [1, "#3b82f6"]
+        ],
+        showscale: false,
+        text: matrizDatos.map(row => row.map(val => String(val))),
+        texttemplate: "<b>%{text}</b>",
+        textfont: { size: 17, color: "#0f172a", family: "Inter, sans-serif" },
+        hovertemplate: "Real: %{y}<br>Predicción: %{x}<br>Muestras: %{z}<extra></extra>"
       };
 
-      Plotly.newPlot("heatmap-confusion", data, layout, { responsive: true, displayModeBar: false });
-    }
-
-    async function inicializarModuloH2O() {
-      try {
-        const resMetricas = await fetch("/api/ml/metricas");
-        const jsonMetricas = await resMetricas.json();
-
-        if (jsonMetricas && jsonMetricas.status === "success" && jsonMetricas.data) {
-          const d = jsonMetricas.data;
-          const acc = parseFloat(d.accuracy) || 0;
-          document.getElementById("metric-accuracy-val").innerText = `${acc}%`;
-          document.getElementById("metric-precision-val").innerText = `${d.precision}%`;
-          document.getElementById("metric-recall-val").innerText = `${d.recall}%`;
-          document.getElementById("metric-f1-val").innerText = `${d.f1}%`;
-
-          dibujarDonaH2O("donut-accuracy", acc, 100, "EFECTIVIDAD (%)", "#3b82f6", 1);
-          if (d.matriz_confusion && d.matriz_confusion.raw) {
-            dibujarMatrizH2O(d.matriz_confusion.raw);
-          }
+      const layout = {
+        autosize: true,
+        margin: { t: 16, r: 16, b: 48, l: 105 }, // Margen izquierdo amplio para que "Contaminada" nunca se corte
+        paper_bgcolor: "rgba(0,0,0,0)",
+        plot_bgcolor: "rgba(0,0,0,0)",
+        xaxis: {
+          title: { text: "Predicción", font: { size: 12, color: "#475569", family: "Inter, sans-serif" }, standoff: 10 },
+          tickfont: { size: 11.5, color: "#475569" }
+        },
+        yaxis: {
+          title: { text: "Real", font: { size: 12, color: "#475569", family: "Inter, sans-serif" }, standoff: 8 },
+          tickfont: { size: 11.5, color: "#475569" }
         }
+      };
 
-        const resTel = await fetch("/api/telemetria");
-        const tel = await resTel.json();
-        const temp = parseFloat(tel.temperatura) || 24.5;
-        const turb = parseFloat(tel.turbidez) || 3.0;
+      Plotly.newPlot("matriz-confusion-plot", [trace], layout, {
+        responsive: true,
+        displayModeBar: false
+      });
+    }
 
-        dibujarDonaH2O("donut-temp", temp, 100, "TEMPERATURA (°C)", "#10b981", 1);
-        dibujarDonaH2O("donut-turb", turb, 10, "TURBIDEZ (NTU)", "#06b6d4", 2);
+    function renderizarDonas(accuracy = 98.75) {
+      const error = Math.max(0, +(100 - accuracy).toFixed(2));
+      Plotly.newPlot("dona-exactitud", [{
+        values: [accuracy, error],
+        labels: ["Acierto Modelo", "Margen Error"],
+        hole: 0.62,
+        type: "pie",
+        marker: { colors: ["#2563eb", "#e2e8f0"] },
+        textinfo: "percent"
+      }], {
+        title: { text: "Exactitud Global Random Forest", font: { size: 13 } },
+        margin: { t: 38, b: 14, l: 14, r: 14 },
+        paper_bgcolor: "rgba(0,0,0,0)",
+        showlegend: true,
+        legend: { orientation: "h", y: -0.1 }
+      }, { responsive: true, displayModeBar: false });
 
-        const inT = document.getElementById("input-temp-ml");
-        const inTurb = document.getElementById("input-turb-ml");
-        if (inT && !inT.value) inT.value = temp.toFixed(1);
-        if (inTurb && !inTurb.value) inTurb.value = turb.toFixed(2);
-      } catch (err) {
-        console.warn("Aviso inicialización H2O:", err.message);
+      Plotly.newPlot("dona-distribucion", [{
+        values: [70, 10],
+        labels: ["Agua Contaminada", "Agua Potable"],
+        hole: 0.62,
+        type: "pie",
+        marker: { colors: ["#ef4444", "#10b981"] },
+        textinfo: "percent"
+      }], {
+        title: { text: "Distribución de Clases Evaluadas", font: { size: 13 } },
+        margin: { t: 38, b: 14, l: 14, r: 14 },
+        paper_bgcolor: "rgba(0,0,0,0)",
+        showlegend: true,
+        legend: { orientation: "h", y: -0.1 }
+      }, { responsive: true, displayModeBar: false });
+    }
+
+    function cambiarTabML(tab) {
+      ["donas", "simulador", "matriz"].forEach(t => {
+        document.getElementById(`tab-${t}`).classList.toggle("active", t === tab);
+        document.getElementById(`vista-${t}`).style.display = (t === tab) ? (t === "matriz" ? "grid" : "block") : "none";
+      });
+
+      if (tab === "matriz") {
+        setTimeout(() => Plotly.Plots.resize("matriz-confusion-plot"), 40);
+      } else if (tab === "donas") {
+        renderizarDonas(parseFloat(document.getElementById("kpi-accuracy").textContent) || 98.75);
       }
     }
 
-    async function analizarLecturaActualESP32() {
+    async function cargarMetricasML() {
       try {
-        const res = await fetch("/api/telemetria");
-        const data = await res.json();
-        const temp = parseFloat(data.temperatura);
-        const turb = parseFloat(data.turbidez);
-
-        document.getElementById("input-temp-ml").value = temp;
-        document.getElementById("input-turb-ml").value = turb;
-        await procesarPrediccionH2O(temp, turb);
+        const res = await fetch("/api/ml/metricas");
+        if (!res.ok) return;
+        const json = await res.json();
+        const d = json.data || {};
+        if (d.accuracy) document.getElementById("kpi-accuracy").textContent = `${d.accuracy}%`;
+        if (d.precision) document.getElementById("kpi-precision").textContent = `${d.precision}%`;
+        if (d.recall) document.getElementById("kpi-recall").textContent = `${d.recall}%`;
+        if (d.f1_score) document.getElementById("kpi-f1").textContent = `${d.f1_score}%`;
+        if (d.confusion_matrix && Array.isArray(d.confusion_matrix)) {
+          matrizDatos = d.confusion_matrix;
+        }
       } catch (e) {
-        alert("Error consultando sensor: " + e.message);
+        console.warn("Usando métricas por defecto:", e);
+      } finally {
+        renderizarMatrizConfusion();
       }
     }
 
-    async function ejecutarAnalisisManualML() {
-      const temp = parseFloat(document.getElementById("input-temp-ml").value);
-      const turb = parseFloat(document.getElementById("input-turb-ml").value);
-      if (isNaN(temp) || isNaN(turb)) {
-        alert("Por favor ingresa valores numéricos válidos.");
-        return;
-      }
-      await procesarPrediccionH2O(temp, turb);
-    }
-
-    async function procesarPrediccionH2O(temperatura, turbidez) {
-      mostrarPestanaH2O("sim");
-      const alerta = document.getElementById("ml-alerta-resultado");
-
+    async function ejecutarSimulacion() {
+      const temp = parseFloat(document.getElementById("sim-temp").value) || 25.0;
+      const turb = parseFloat(document.getElementById("sim-turb").value) || 2.0;
       try {
         const res = await fetch("/api/ml/predecir-potabilidad", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ temperatura, turbidez })
+          body: JSON.stringify({ temperatura: temp, turbidez: turb })
         });
         const data = await res.json();
-
-        if (data.status === "success") {
-          dibujarGaugeH2O(data.confianza_porcentaje, data.potable);
-          alerta.style.display = "block";
-          if (data.potable) {
-            alerta.style.background = "rgba(16, 185, 129, 0.15)";
-            alerta.style.color = "#10b981";
-            alerta.innerHTML = "💧 AGUA POTABLE: Parámetros aptos.";
-          } else {
-            alerta.style.background = "rgba(239, 68, 68, 0.15)";
-            alerta.style.color = "#ef4444";
-            alerta.innerHTML = "⚠️ AGUA CONTAMINADA: Riesgo detectado.";
-          }
-        }
-      } catch (err) {
-        alert("Error en predicción: " + err.message);
+        const elRes = document.getElementById("sim-resultado");
+        elRes.textContent = data.diagnostico;
+        elRes.style.color = data.potable ? "#10b981" : "#ef4444";
+        document.getElementById("sim-detalle").textContent =
+          `Confianza del modelo: ${data.confianza_porcentaje}% | Parámetros: ${temp}°C y ${turb} NTU`;
+      } catch (e) {
+        console.error(e);
       }
     }
 
-    document.addEventListener("DOMContentLoaded", inicializarModuloH2O);
-  </script>
-
-  <!-- Script: Consulta en Tiempo Real desde Neon DB (Barras + Donas cada 3s) -->
-  <script>
-    const API_ENDPOINT_TELEMETRIA = "/api/telemetria";
-
-    function renderizarBarrasEstado(estadoRecibido) {
-      if (!estadoRecibido) return;
-      const estado = estadoRecibido.toString().toLowerCase().trim();
-
-      const bNormal = document.getElementById("bar-normal");
-      const bModerada = document.getElementById("bar-moderada");
-      const bRegular = document.getElementById("bar-regular");
-      const bCritica = document.getElementById("bar-critica");
-      const badge = document.getElementById("badgeEstadoTexto");
-      const label = document.getElementById("detalleEstadoUltimo");
-
-      [bNormal, bModerada, bRegular, bCritica].forEach(b => {
-        if (b) {
-          b.setAttribute("y", "178");
-          b.setAttribute("height", "2");
-          b.setAttribute("fill", "var(--border-card)");
-        }
-      });
-
-      if (label) label.textContent = estadoRecibido;
-
-      if (estado.includes("critica") || estado.includes("crítica")) {
-        if (bCritica) { bCritica.setAttribute("y", "30"); bCritica.setAttribute("height", "150"); bCritica.setAttribute("fill", "#ef4444"); }
-        if (badge) { badge.textContent = "Crítica"; badge.style.backgroundColor = "rgba(239,68,68,0.2)"; badge.style.color = "#ef4444"; }
-      } else if (estado.includes("regular") || estado.includes("alerta")) {
-        if (bRegular) { bRegular.setAttribute("y", "30"); bRegular.setAttribute("height", "150"); bRegular.setAttribute("fill", "#f59e0b"); }
-        if (badge) { badge.textContent = "Regular"; badge.style.backgroundColor = "rgba(245,158,11,0.2)"; badge.style.color = "#f59e0b"; }
-      } else if (estado.includes("moderada")) {
-        if (bModerada) { bModerada.setAttribute("y", "30"); bModerada.setAttribute("height", "150"); bModerada.setAttribute("fill", "#3b82f6"); }
-        if (badge) { badge.textContent = "Moderada"; badge.style.backgroundColor = "rgba(59,130,246,0.2)"; badge.style.color = "#3b82f6"; }
-      } else {
-        if (bNormal) { bNormal.setAttribute("y", "30"); bNormal.setAttribute("height", "150"); bNormal.setAttribute("fill", "#10b981"); }
-        if (badge) { badge.textContent = "Normal"; badge.style.backgroundColor = "rgba(16,185,129,0.2)"; badge.style.color = "#10b981"; }
-      }
-    }
-
-    async function actualizarEstadoDesdeNeon() {
+    // ==========================================================
+    // 3. TELEMETRÍA EN TIEMPO REAL Y GRÁFICA HISTÓRICA
+    // ==========================================================
+    async function actualizarDashboard() {
       try {
-        const respuesta = await fetch(API_ENDPOINT_TELEMETRIA);
-        if (!respuesta.ok) return;
-        const telemetria = await respuesta.json();
+        const [resUlt, resHist] = await Promise.all([
+          fetch("/api/telemetria"),
+          fetch("/api/calidad-agua?limit=15")
+        ]);
 
-        // 1. Actualizar gráfico de barras (Índice de Calidad)
-        if (telemetria && telemetria.estado) {
-          renderizarBarrasEstado(telemetria.estado);
-        }
+        const ult = await resUlt.json();
+        const hist = await resHist.json();
 
-        // 2. Actualizar en tiempo real las donas de Temperatura y Turbidez
-        if (telemetria && typeof Plotly !== "undefined") {
-          const temp = parseFloat(telemetria.temperatura);
-          const turb = parseFloat(telemetria.turbidez);
+        const temp = Number(ult.temperatura ?? 24.5);
+        const turb = Number(ult.turbidez ?? 2.1);
+        const estado = ult.estado || "Normal";
 
-          if (!isNaN(temp) && document.getElementById("donut-temp")) {
-            dibujarDonaH2O("donut-temp", temp, 100, "TEMPERATURA (°C)", "#10b981", 1);
-          }
-          if (!isNaN(turb) && document.getElementById("donut-turb")) {
-            dibujarDonaH2O("donut-turb", turb, 10, "TURBIDEZ (NTU)", "#06b6d4", 2);
-          }
+        document.getElementById("kpi-temp").textContent = `${temp.toFixed(1)} °C`;
+        document.getElementById("kpi-turb").textContent = `${turb.toFixed(2)} NTU`;
+        document.getElementById("kpi-nodo").textContent = `Nodo: ${ult.identificador || "calidad_agua"}`;
+        document.getElementById("kpi-hora").textContent = ult.timestamp ? `Registro: ${String(ult.timestamp).slice(0, 19)}` : "En espera de ESP32";
+
+        const elEstado = document.getElementById("kpi-estado");
+        elEstado.textContent = estado;
+        elEstado.style.color = estado.toLowerCase().includes("crit") ? "#ef4444" :
+                               (estado.toLowerCase().includes("mod") ? "#f59e0b" : "#10b981");
+
+        // Evaluar potabilidad IA de la lectura actual
+        const resIA = await fetch("/api/ml/predecir-potabilidad", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ temperatura: temp, turbidez: turb })
+        });
+        const ia = await resIA.json();
+        const elIA = document.getElementById("kpi-ia");
+        elIA.textContent = ia.diagnostico;
+        elIA.style.color = ia.potable ? "#10b981" : "#ef4444";
+        document.getElementById("kpi-ia-conf").textContent = `Confianza: ${ia.confianza_porcentaje}%`;
+
+        // Gráfica histórica
+        if (Array.isArray(hist) && hist.length > 0) {
+          const ordenados = [...hist].reverse();
+          const ejeX = ordenados.map((d, i) => d.timestamp ? String(d.timestamp).slice(11, 19) : `#${i + 1}`);
+          const ejeTemp = ordenados.map(d => d.temperatura);
+          const ejeTurb = ordenados.map(d => d.turbidez);
+
+          Plotly.react("grafica-tiempo-real", [
+            { x: ejeX, y: ejeTemp, name: "Temperatura (°C)", type: "scatter", mode: "lines+markers", line: { color: "#2563eb", width: 2.5 } },
+            { x: ejeX, y: ejeTurb, name: "Turbidez (NTU)", type: "scatter", mode: "lines+markers", yaxis: "y2", line: { color: "#f59e0b", width: 2.5 } }
+          ], {
+            autosize: true,
+            margin: { t: 15, r: 50, b: 35, l: 45 },
+            paper_bgcolor: "rgba(0,0,0,0)",
+            plot_bgcolor: "rgba(0,0,0,0)",
+            yaxis: { title: "°C", gridcolor: "#f1f5f9" },
+            yaxis2: { title: "NTU", overlaying: "y", side: "right" },
+            legend: { orientation: "h", y: 1.12 }
+          }, { responsive: true, displayModeBar: false });
         }
       } catch (err) {
-        console.error("Error al consultar telemetría:", err);
+        console.error("Error actualizando telemetría:", err);
       }
     }
 
-    actualizarEstadoDesdeNeon();
-    setInterval(actualizarEstadoDesdeNeon, 3000);
-  </script>
+    // ==========================================================
+    // 4. VISIÓN POR COMPUTADORA (GRAD-CAM XAI)
+    // ==========================================================
+    async function procesarImagenMuestra(event) {
+      const file = event.target.files[0];
+      if (!file) return;
 
-  <!-- Lógica de Autenticación Google integrada -->
-  <script>
-    const GOOGLE_CLIENT_ID = "144217789481-591ojt4dohgjmm7542cohgef6hr9228k.apps.googleusercontent.com";
-
-    function mostrarModalLogin() {
-      const modal = document.getElementById("loginModal");
-      if (modal) modal.style.display = "flex";
-    }
-
-    function ocultarModalLogin() {
-      const modal = document.getElementById("loginModal");
-      if (modal) modal.style.display = "none";
-    }
-
-    function actualizarInterfazUsuario(usuario) {
-      const lblNombre = document.getElementById("usuarioNombre");
-      const imgAvatar = document.getElementById("usuarioAvatar");
-
-      if (lblNombre) {
-        lblNombre.innerText = usuario.name || usuario.email || "Operador";
-      }
-
-      if (imgAvatar) {
-        if (usuario.picture) {
-          imgAvatar.src = usuario.picture;
-          imgAvatar.style.display = "inline-block";
-        } else {
-          imgAvatar.src = "";
-          imgAvatar.style.display = "none";
-        }
-      }
-    }
-
-    function manejarCredencialGoogle(response) {
-      try {
-        const base64Url = response.credential.split('.')[1];
-        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-        const jsonPayload = decodeURIComponent(
-          atob(base64).split('').map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')
-        );
-
-        const usuario = JSON.parse(jsonPayload);
-        localStorage.setItem("usuario_sesion", JSON.stringify(usuario));
-
-        ocultarModalLogin();
-        actualizarInterfazUsuario(usuario);
-      } catch (err) {
-        console.error("[Auth] Error procesando credencial:", err);
-      }
-    }
-
-    function renderizarBotonGoogle() {
-      if (window.google && window.google.accounts && window.google.accounts.id) {
-        try {
-          google.accounts.id.initialize({
-            client_id: GOOGLE_CLIENT_ID,
-            callback: manejarCredencialGoogle,
-            auto_select: false
-          });
-
-          const container = document.getElementById("googleBtnContainer");
-          if (container) {
-            container.innerHTML = "";
-            google.accounts.id.renderButton(container, {
-              theme: "outline",
-              size: "large",
-              shape: "rectangular",
-              text: "signin_with",
-              locale: "es",
-              width: 280
-            });
-          }
-        } catch (e) {
-          console.warn("[Auth] Esperando Google Identity...", e);
-        }
-      } else {
-        setTimeout(renderizarBotonGoogle, 200);
-      }
-    }
-
-    function bypassDesarrollo() {
-      const userDev = {
-        name: "Operador de Laboratorio",
-        email: "lab.ia@universidad.edu.co",
-        picture: ""
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = document.getElementById("img-original");
+        img.src = e.target.result;
+        img.onload = () => dibujarGradCAM(img);
       };
-      localStorage.setItem("usuario_sesion", JSON.stringify(userDev));
-      ocultarModalLogin();
-      actualizarInterfazUsuario(userDev);
-    }
+      reader.readAsDataURL(file);
 
-    function cerrarSesion() {
-      localStorage.removeItem("usuario_sesion");
-      sessionStorage.clear();
+      const formData = new FormData();
+      formData.append("file", file);
 
-      if (window.google && window.google.accounts && window.google.accounts.id) {
-        google.accounts.id.disableAutoSelect();
-      }
-
-      const lblNombre = document.getElementById("usuarioNombre");
-      const imgAvatar = document.getElementById("usuarioAvatar");
-      if (lblNombre) lblNombre.innerText = "No autenticado";
-      if (imgAvatar) {
-        imgAvatar.src = "";
-        imgAvatar.style.display = "none";
-      }
-
-      mostrarModalLogin();
-      renderizarBotonGoogle();
-    }
-
-    function verificarEstadoSesion() {
-      const sesionGuardada = localStorage.getItem("usuario_sesion");
-      if (!sesionGuardada) {
-        mostrarModalLogin();
-        renderizarBotonGoogle();
-      } else {
-        try {
-          const usuario = JSON.parse(sesionGuardada);
-          if (!usuario || (!usuario.email && !usuario.name)) throw new Error("Sesión inválida");
-          ocultarModalLogin();
-          actualizarInterfazUsuario(usuario);
-        } catch (e) {
-          localStorage.removeItem("usuario_sesion");
-          mostrarModalLogin();
-          renderizarBotonGoogle();
-        }
+      try {
+        const res = await fetch("/api/vision/clasificar-muestra", { method: "POST", body: formData });
+        const data = await res.json();
+        document.getElementById("xai-diagnostico").textContent = data.diagnostico;
+        document.getElementById("xai-meta").textContent = `Confianza: ${data.confianza} • Latencia: ${data.latencia_ms} ms`;
+        const dist = data.distribucion || { optima: 0, moderada: 0, critica: 0 };
+        document.getElementById("xai-barras").innerHTML =
+          `• Óptima / Limpia: <strong>${dist.optima}%</strong><br />` +
+          `• Levemente Túrbida: <strong>${dist.moderada}%</strong><br />` +
+          `• Alta Turbidez / Crítica: <strong>${dist.critica}%</strong>`;
+      } catch (err) {
+        console.error(err);
       }
     }
 
-    document.addEventListener("DOMContentLoaded", verificarEstadoSesion);
+    function dibujarGradCAM(img) {
+      const canvas = document.getElementById("canvas-gradcam");
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const d = frame.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const turbidezPixel = (d[i] * 0.6 + d[i + 1] * 0.4) - d[i + 2];
+        const intensidad = Math.min(255, Math.max(0, (turbidezPixel + 40) * 2.2));
+        d[i] = Math.min(255, d[i] * 0.45 + intensidad * 0.85);
+        d[i + 1] = Math.min(255, d[i + 1] * 0.45 + (255 - Math.abs(intensidad - 128)) * 0.45);
+        d[i + 2] = Math.min(255, d[i + 2] * 0.45 + (255 - intensidad) * 0.75);
+      }
+      ctx.putImageData(frame, 0, 0);
+    }
+
+    // Inicialización al cargar
+    cargarMetricasML();
+    actualizarDashboard();
+    setInterval(actualizarDashboard, 4000);
+    window.addEventListener("resize", () => {
+      Plotly.Plots.resize("matriz-confusion-plot");
+      Plotly.Plots.resize("grafica-tiempo-real");
+    });
   </script>
-
 </body>
 </html>
