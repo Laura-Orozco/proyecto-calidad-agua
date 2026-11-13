@@ -413,7 +413,7 @@
       border-top: 1px solid var(--border-card);
     }
 
-    /* Modal de Inicio de Sesión con Google */
+    /* Modal de Inicio de Sesión con Google y Modales */
     .login-modal-overlay {
       display: none;
       position: fixed;
@@ -457,6 +457,46 @@
       <button type="button" onclick="bypassDesarrollo()" style="background: transparent; border: none; color: var(--text-muted); font-size: 0.78rem; text-decoration: underline; cursor: pointer;">
         Continuar como operador local
       </button>
+    </div>
+  </div>
+
+  <!-- MODAL DE MATRIZ DE CONFUSIÓN AMPLIADA -->
+  <div id="matrizModal" class="login-modal-overlay" onclick="if(event.target===this) cerrarModalMatriz()">
+    <div class="login-modal-card" style="max-width: 760px; width: 95%; text-align: left; padding: 24px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-card); padding-bottom: 12px; margin-bottom: 18px;">
+        <div>
+          <h3 style="color: var(--text-title); font-size: 1.15rem; font-weight: 700;">
+            📊 Matriz de Confusión Completa (Random Forest H2O)
+          </h3>
+          <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 2px;">
+            Comparación detallada entre valores reales y predicciones del modelo
+          </p>
+        </div>
+        <button type="button" onclick="cerrarModalMatriz()" style="background: var(--btn-bg); border: 1px solid var(--border-card); color: var(--text-title); width: 32px; height: 32px; border-radius: 8px; cursor: pointer; font-weight: 700;">✕</button>
+      </div>
+
+      <div class="h2o-subbox" style="padding: 12px; margin-bottom: 16px; overflow: hidden;">
+        <div id="heatmap-confusion-modal" style="width: 100%; height: 320px;"></div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px;">
+        <div class="h2o-subbox" style="padding: 12px;">
+          <span style="font-size: 0.68rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Exactitud</span>
+          <div id="modal-metric-accuracy" style="font-size: 1.2rem; font-weight: 800; color: var(--text-title); margin-top: 4px;">--%</div>
+        </div>
+        <div class="h2o-subbox" style="padding: 12px;">
+          <span style="font-size: 0.68rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Precisión</span>
+          <div id="modal-metric-precision" style="font-size: 1.2rem; font-weight: 800; color: var(--text-title); margin-top: 4px;">--%</div>
+        </div>
+        <div class="h2o-subbox" style="padding: 12px;">
+          <span style="font-size: 0.68rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Recall</span>
+          <div id="modal-metric-recall" style="font-size: 1.2rem; font-weight: 800; color: var(--text-title); margin-top: 4px;">--%</div>
+        </div>
+        <div class="h2o-subbox" style="padding: 12px;">
+          <span style="font-size: 0.68rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">F1-Score</span>
+          <div id="modal-metric-f1" style="font-size: 1.2rem; font-weight: 800; color: var(--text-title); margin-top: 4px;">--%</div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -649,27 +689,32 @@
 
         <!-- VISTA 3: HEATMAP MATRIZ DE CONFUSIÓN -->
         <div id="h2o-vista-matriz" style="display: none;">
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; align-items: center;">
-            <div class="h2o-subbox" style="padding: 8px;">
-              <div id="heatmap-confusion" style="height: 245px;"></div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; align-items: center;">
+            <div class="h2o-subbox" style="padding: 10px; overflow: hidden;">
+              <div id="heatmap-confusion" style="width: 100%; height: 245px;"></div>
             </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-              <div class="h2o-subbox" style="padding: 16px;">
-                <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Exactitud</span>
-                <div id="metric-accuracy-val" style="font-size: 1.35rem; font-weight: 800; color: var(--text-title); margin-top: 4px;">--%</div>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div class="h2o-subbox" style="padding: 16px;">
+                  <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Exactitud</span>
+                  <div id="metric-accuracy-val" style="font-size: 1.35rem; font-weight: 800; color: var(--text-title); margin-top: 4px;">--%</div>
+                </div>
+                <div class="h2o-subbox" style="padding: 16px;">
+                  <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Precisión</span>
+                  <div id="metric-precision-val" style="font-size: 1.35rem; font-weight: 800; color: var(--text-title); margin-top: 4px;">--%</div>
+                </div>
+                <div class="h2o-subbox" style="padding: 16px;">
+                  <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Recall</span>
+                  <div id="metric-recall-val" style="font-size: 1.35rem; font-weight: 800; color: var(--text-title); margin-top: 4px;">--%</div>
+                </div>
+                <div class="h2o-subbox" style="padding: 16px;">
+                  <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">F1-Score</span>
+                  <div id="metric-f1-val" style="font-size: 1.35rem; font-weight: 800; color: var(--text-title); margin-top: 4px;">--%</div>
+                </div>
               </div>
-              <div class="h2o-subbox" style="padding: 16px;">
-                <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Precisión</span>
-                <div id="metric-precision-val" style="font-size: 1.35rem; font-weight: 800; color: var(--text-title); margin-top: 4px;">--%</div>
-              </div>
-              <div class="h2o-subbox" style="padding: 16px;">
-                <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Recall</span>
-                <div id="metric-recall-val" style="font-size: 1.35rem; font-weight: 800; color: var(--text-title); margin-top: 4px;">--%</div>
-              </div>
-              <div class="h2o-subbox" style="padding: 16px;">
-                <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">F1-Score</span>
-                <div id="metric-f1-val" style="font-size: 1.35rem; font-weight: 800; color: var(--text-title); margin-top: 4px;">--%</div>
-              </div>
+              <button type="button" class="btn btn-primary" onclick="abrirModalMatriz()" style="width: 100%;">
+                🔍 Ampliar Matriz en Ventana Modal
+              </button>
             </div>
           </div>
         </div>
@@ -1049,8 +1094,10 @@
     }
   </script>
 
-  <!-- Script: Gráficos H2O (Donas, Gauge y Matriz) adaptados al Tema Claro/Oscuro -->
+  <!-- Script: Gráficos H2O (Donas, Gauge y Matriz + Modal) adaptados al Tema Claro/Oscuro -->
   <script>
+    let ultimaMatrizH2O = [[69, 0], [1, 10]];
+
     function obtenerColoresTemaPlotly() {
       const esOscuro = (document.documentElement.getAttribute("data-theme") || "dark") === "dark";
       return {
@@ -1062,6 +1109,25 @@
       };
     }
 
+    function abrirModalMatriz() {
+      const modal = document.getElementById("matrizModal");
+      if (!modal) return;
+      modal.style.display = "flex";
+
+      document.getElementById("modal-metric-accuracy").innerText = document.getElementById("metric-accuracy-val").innerText;
+      document.getElementById("modal-metric-precision").innerText = document.getElementById("metric-precision-val").innerText;
+      document.getElementById("modal-metric-recall").innerText = document.getElementById("metric-recall-val").innerText;
+      document.getElementById("modal-metric-f1").innerText = document.getElementById("metric-f1-val").innerText;
+
+      dibujarMatrizEnContenedor("heatmap-confusion-modal", ultimaMatrizH2O, 320);
+      setTimeout(() => Plotly.Plots.resize("heatmap-confusion-modal"), 50);
+    }
+
+    function cerrarModalMatriz() {
+      const modal = document.getElementById("matrizModal");
+      if (modal) modal.style.display = "none";
+    }
+
     function mostrarPestanaH2O(vista) {
       document.getElementById("h2o-vista-donuts").style.display = vista === "donuts" ? "block" : "none";
       document.getElementById("h2o-vista-sim").style.display = vista === "sim" ? "block" : "none";
@@ -1071,6 +1137,11 @@
         const btn = document.getElementById("tab-h2o-" + id);
         if (btn) btn.classList.toggle("active", id === vista);
       });
+
+      if (vista === "matriz") {
+        setTimeout(() => Plotly.Plots.resize("heatmap-confusion"), 40);
+        abrirModalMatriz();
+      }
     }
 
     function dibujarDonaH2O(elementId, valor, maxVal, titulo, color, decimales) {
@@ -1138,8 +1209,8 @@
       Plotly.newPlot("gauge-confianza", data, layout, { responsive: true, displayModeBar: false });
     }
 
-    function dibujarMatrizH2O(matrizRaw) {
-      const el = document.getElementById("heatmap-confusion");
+    function dibujarMatrizEnContenedor(elementId, matrizRaw, alto) {
+      const el = document.getElementById(elementId);
       if (!el || typeof Plotly === "undefined") return;
 
       const c = obtenerColoresTemaPlotly();
@@ -1159,7 +1230,7 @@
             x: data[0].x[j],
             y: data[0].y[i],
             text: `<b>${matrizRaw[i][j]}</b>`,
-            font: { color: c.textoPrincipal, size: 16 },
+            font: { color: c.textoPrincipal, size: 17 },
             showarrow: false
           });
         }
@@ -1167,15 +1238,24 @@
 
       const layout = {
         annotations: anotaciones,
-        height: 240,
-        margin: { l: 75, r: 15, t: 15, b: 40 },
+        autosize: true,
+        height: alto,
+        margin: { l: 105, r: 20, t: 18, b: 48 },
         xaxis: { title: "<b>Predicción</b>", color: c.textoSecundario },
         yaxis: { title: "<b>Real</b>", color: c.textoSecundario },
         paper_bgcolor: "rgba(0,0,0,0)",
         plot_bgcolor: "rgba(0,0,0,0)"
       };
 
-      Plotly.newPlot("heatmap-confusion", data, layout, { responsive: true, displayModeBar: false });
+      Plotly.newPlot(elementId, data, layout, { responsive: true, displayModeBar: false });
+    }
+
+    function dibujarMatrizH2O(matrizRaw) {
+      ultimaMatrizH2O = matrizRaw;
+      dibujarMatrizEnContenedor("heatmap-confusion", matrizRaw, 240);
+      if (document.getElementById("matrizModal")?.style.display === "flex") {
+        dibujarMatrizEnContenedor("heatmap-confusion-modal", matrizRaw, 320);
+      }
     }
 
     async function inicializarModuloH2O() {
