@@ -1,45 +1,64 @@
 import os
 import json
+import time
 import urllib.request
 from modelo.ml_potabilidad import predecir_potabilidad
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 
+_ultima_alerta_ts = 0
+COOLDOWN_ALERTA_SEGUNDOS = 60
+
 def enviar_mensaje_telegram(texto: str, chat_id: str = None):
     token = os.getenv("TELEGRAM_BOT_TOKEN", TELEGRAM_BOT_TOKEN)
-    destino = chat_id or os.getenv("TELEGRAM_CHAT_ID", TELEGRAM_CHAT_ID)
-    if not token or not destino:
+    raw_destinos = chat_id or os.getenv("TELEGRAM_CHAT_ID", TELEGRAM_CHAT_ID)
+    if not token or not raw_destinos:
         print("[Telegram Warning] Faltan TELEGRAM_BOT_TOKEN o TELEGRAM_CHAT_ID.")
         return False
 
+    lista_ids = [cid.strip() for cid in str(raw_destinos).split(",") if cid.strip()]
     url = f"https://api.telegram.org/bot{token}/sendMessage"
-    payload = json.dumps({
-        "chat_id": destino,
-        "text": texto,
-        "parse_mode": "Markdown"
-    }).encode("utf-8")
+    enviado_alguno = False
 
-    req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
-    try:
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            return resp.status == 200
-    except Exception as e:
-        print(f"[Telegram Error]: {e}")
-        return False
+    for destino in lista_ids:
+        payload = json.dumps({
+            "chat_id": destino,
+            "text": texto,
+            "parse_mode": "Markdown"
+        }).encode("utf-8")
+
+        req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                if resp.status == 200:
+                    enviado_alguno = True
+        except Exception as e:
+            print(f"[Telegram Error para {destino}]: {e}")
+
+    return enviado_alguno
 
 def notificar_alerta_critica(temperatura: float, turbidez: float, estado: str, identificador: str = "calidad_agua"):
-    if "critica" not in estado.lower() and "crítica" not in estado.lower():
-        return False
+    global _ultima_alerta_ts
 
     pred = predecir_potabilidad(temperatura, turbidez)
+
+    # Solo alerta si el modelo clasifica estrictamente como "Agua Contaminada"
+    if pred.get("potable", True) or pred.get("diagnostico") != "Agua Contaminada":
+        return False
+
+    ahora = time.time()
+    if (ahora - _ultima_alerta_ts) < COOLDOWN_ALERTA_SEGUNDOS:
+        return False
+
+    _ultima_alerta_ts = ahora
+
     mensaje = (
-        "🚨 *ALERTA CRÍTICA DE CALIDAD DEL AGUA*\n\n"
+        "🚨 *ALERTA: AGUA CONTAMINADA DETECTADA*\n\n"
         f"📍 *Nodo:* `{identificador}`\n"
         f"🌡️ *Temperatura:* `{temperatura:.1f} °C`\n"
         f"💧 *Turbidez:* `{turbidez:.2f} NTU`\n"
-        f"⚠️ *Estado IoT:* *{estado}*\n"
-        f"🤖 *Diagnóstico IA:* {pred['diagnostico']} ({pred['confianza_porcentaje']}% confianza)\n\n"
+        f"🤖 *Diagnóstico IA:* *{pred['diagnostico']}* ({pred['confianza_porcentaje']}% confianza)\n\n"
         "_Se recomienda inspección inmediata del efluente o activación de purga._"
     )
     return enviar_mensaje_telegram(mensaje)
