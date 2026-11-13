@@ -1089,12 +1089,29 @@
       }
     }
 
-    async function actualizarEstadoDesdeNeon() {
+async function actualizarEstadoDesdeNeon() {
       try {
-        const respuesta = await fetch(API_ENDPOINT_TELEMETRIA);
+        const respuesta = await fetch("/api/telemetria");
         if (!respuesta.ok) return;
         const telemetria = await respuesta.json();
-        if (telemetria && telemetria.estado) renderizarBarrasEstado(telemetria.estado);
+
+        // 1. Actualizar gráfico de barras (Índice de Calidad)
+        if (telemetria && telemetria.estado) {
+          renderizarBarrasEstado(telemetria.estado);
+        }
+
+        // 2. Actualizar en tiempo real las donas de Kevin (Temperatura y Turbidez)
+        if (telemetria && typeof Plotly !== "undefined") {
+          const temp = parseFloat(telemetria.temperatura);
+          const turb = parseFloat(telemetria.turbidez);
+
+          if (!isNaN(temp) && document.getElementById("donut-temp")) {
+            dibujarDonaH2O("donut-temp", temp, 100, "TEMPERATURA (°C)", "#10b981", 1);
+          }
+          if (!isNaN(turb) && document.getElementById("donut-turb")) {
+            dibujarDonaH2O("donut-turb", turb, 10, "TURBIDEZ (NTU)", "#06b6d4", 2);
+          }
+        }
       } catch (err) {
         console.error("Error al consultar telemetría:", err);
       }
