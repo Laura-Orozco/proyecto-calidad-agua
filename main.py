@@ -1,6 +1,7 @@
 import os
 import time
 import io
+import urllib.request
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from fastapi import FastAPI, HTTPException, UploadFile, File, Request
@@ -60,7 +61,7 @@ class PrediccionMLIn(BaseModel):
     turbidez: float
 
 # ==========================================================
-# RUTA EXACTA PARA EL ESP32 (/api/esp32/enviar-datos)
+# RUTA EXACTA PARA EL ESP32 + REENVÍO A THINGSPEAK
 # ==========================================================
 @app.post("/api/esp32/enviar-datos")
 @app.post("/api/telemetria")
@@ -91,6 +92,15 @@ async def recibir_datos_esp32(request: Request):
         conn.commit()
         cur.close()
         conn.close()
+
+        # Reenvío hacia ThingSpeak (Canal 3543191) aislado en try/except
+        try:
+            ts_key = "H20B180D9AB4YGYH"
+            estado_num = 3 if estado == "Crítica" else (2 if estado == "Moderada" else 1)
+            ts_url = f"https://api.thingspeak.com/update?api_key={ts_key}&field1={temp}&field2={turb}&field3={estado_num}"
+            urllib.request.urlopen(ts_url, timeout=4).read()
+        except Exception as ts_err:
+            print(f"[ThingSpeak Warning]: {ts_err}")
 
         return {"status": "success", "id": nuevo_id, "estado_calculado": estado}
     except Exception as e:
@@ -155,7 +165,7 @@ def obtener_frecuencia():
     return {"frecuencia": 3000, "status": "ok"}
 
 # ==========================================================
-# ENDPOINTS MACHINE LEARNING (RANDOM FOREST H2O)
+# ENDPOINTS MACHINE LEARNING (RANDOM FOREST H2O) - INTACTOS
 # ==========================================================
 @app.get("/api/ml/metricas")
 def endpoint_metricas_ml():
