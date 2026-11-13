@@ -1,6 +1,7 @@
 import os
 import time
 import io
+import json
 import urllib.request
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -14,6 +15,11 @@ from modelo.ml_potabilidad import (
     inicializar_modelo_potabilidad,
     obtener_metricas_modelo,
     predecir_potabilidad
+)
+from modelo.telegram_bot import (
+    notificar_alerta_critica,
+    procesar_consulta_usuario,
+    enviar_mensaje_telegram
 )
 
 app = FastAPI(title="Sistema de Monitoreo de Calidad del Agua | IoT & IA")
@@ -61,7 +67,7 @@ class PrediccionMLIn(BaseModel):
     turbidez: float
 
 # ==========================================================
-# RUTA EXACTA PARA EL ESP32 + REENVÍO A THINGSPEAK
+# RUTA EXACTA PARA EL ESP32 + THINGSPEAK + ALERTA TELEGRAM
 # ==========================================================
 @app.post("/api/esp32/enviar-datos")
 @app.post("/api/telemetria")
@@ -93,7 +99,7 @@ async def recibir_datos_esp32(request: Request):
         cur.close()
         conn.close()
 
-        # Reenvío hacia ThingSpeak (Canal 3543191) aislado en try/except
+        # 1. Reenvío hacia ThingSpeak (Canal 3543191)
         try:
             ts_key = "H20B180D9AB4YGYH"
             estado_num = 3 if estado == "Crítica" else (2 if estado == "Moderada" else 1)
@@ -102,10 +108,43 @@ async def recibir_datos_esp32(request: Request):
         except Exception as ts_err:
             print(f"[ThingSpeak Warning]: {ts_err}")
 
+        # 2. Alerta automática a Telegram si el estado es Crítica
+        try:
+            notificar_alerta_critica(temp, turb, estado, identificador)
+        except Exception as tg_err:
+            print(f"[Telegram Alert Warning]: {tg_err}")
+
         return {"status": "success", "id": nuevo_id, "estado_calculado": estado}
     except Exception as e:
         print(f"[Error ESP32 POST]: {e}")
         raise HTTPException(status_code=500, detail=f"Error guardando lectura: {str(e)}")
+
+# ==========================================================
+# ENDPOINTS DEL BOT DE TELEGRAM (WEBHOOK Y CONSULTAS)
+# ==========================================================
+@app.post("/api/telegram/webhook")
+async def telegram_webhook(request: Request):
+    try:
+        data = await request.json()
+        mensaje = data.get("message") or data.get("edited_message")
+        if mensaje and "text" in mensaje:
+            chat_id = str(mensaje["chat"]["id"])
+            texto = mensaje["text"]
+            respuesta = procesar_consulta_usuario(texto, get_db_connection)
+            enviar_mensaje_telegram(respuesta, chat_id=chat_id)
+    except Exception as e:
+        print(f"[Telegram Webhook Error]: {e}")
+    return {"ok": True}
+
+@app.get("/api/telegram/activar-webhook")
+def activar_webhook_telegram():
+    token = os.getenv("TELEGRAM_BOT_TOKEN", "")
+    if not token:
+        raise HTTPException(status_code=400, detail="Falta TELEGRAM_BOT_TOKEN en Render.")
+    webhook_url = "https://proyecto-calidad-agua.onrender.com/api/telegram/webhook"
+    tg_api = f"https://api.telegram.org/bot{token}/setWebhook?url={webhook_url}"
+    res = urllib.request.urlopen(tg_api, timeout=5).read().decode("utf-8")
+    return {"status": "webhook_configurado", "telegram_response": json.loads(res)}
 
 # ==========================================================
 # ENDPOINTS DE CONSULTA Y CONTROL PARA EL DASHBOARD
@@ -165,7 +204,7 @@ def obtener_frecuencia():
     return {"frecuencia": 3000, "status": "ok"}
 
 # ==========================================================
-# ENDPOINTS MACHINE LEARNING (RANDOM FOREST H2O) - INTACTOS
+# ENDPOINTS MACHINE LEARNING (RANDOM FOREST H2O)
 # ==========================================================
 @app.get("/api/ml/metricas")
 def endpoint_metricas_ml():
