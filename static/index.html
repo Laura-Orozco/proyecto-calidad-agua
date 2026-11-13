@@ -468,7 +468,7 @@
             📊 Matriz de Confusión Completa (water_quality.csv)
           </h3>
           <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 4px;">
-            Dataset oficial:
+            Fuente oficial de datos:
             <a href="https://www.kaggle.com/datasets/vishnuverma1441/real-time-water-quality" target="_blank" rel="noopener" style="color: var(--accent-primary); font-weight: 600; text-decoration: underline;">
               🔗 Kaggle: Real Time Water Quality (water_quality.csv) ↗
             </a>
@@ -486,28 +486,28 @@
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
             <div class="h2o-subbox" style="padding: 12px;">
               <span style="font-size: 0.68rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Exactitud</span>
-              <div id="modal-metric-accuracy" style="font-size: 1.25rem; font-weight: 800; color: var(--text-title); margin-top: 4px;">--%</div>
+              <div id="modal-metric-accuracy" style="font-size: 1.25rem; font-weight: 800; color: var(--text-title); margin-top: 4px;">93.41%</div>
             </div>
             <div class="h2o-subbox" style="padding: 12px;">
               <span style="font-size: 0.68rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Precisión</span>
-              <div id="modal-metric-precision" style="font-size: 1.25rem; font-weight: 800; color: var(--text-title); margin-top: 4px;">--%</div>
+              <div id="modal-metric-precision" style="font-size: 1.25rem; font-weight: 800; color: var(--text-title); margin-top: 4px;">87.89%</div>
             </div>
             <div class="h2o-subbox" style="padding: 12px;">
               <span style="font-size: 0.68rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Recall</span>
-              <div id="modal-metric-recall" style="font-size: 1.25rem; font-weight: 800; color: var(--text-title); margin-top: 4px;">--%</div>
+              <div id="modal-metric-recall" style="font-size: 1.25rem; font-weight: 800; color: var(--text-title); margin-top: 4px;">99.75%</div>
             </div>
             <div class="h2o-subbox" style="padding: 12px;">
               <span style="font-size: 0.68rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">F1-Score</span>
-              <div id="modal-metric-f1" style="font-size: 1.25rem; font-weight: 800; color: var(--text-title); margin-top: 4px;">--%</div>
+              <div id="modal-metric-f1" style="font-size: 1.25rem; font-weight: 800; color: var(--text-title); margin-top: 4px;">93.44%</div>
             </div>
           </div>
 
           <div class="h2o-subbox" style="padding: 12px; text-align: left; font-size: 0.78rem; color: var(--text-body); line-height: 1.6;">
             <strong style="color: var(--text-title); display: block; margin-bottom: 4px;">Interpretación del conjunto de prueba (20%):</strong>
-            <div>• <strong>Verdaderos negativos (TN):</strong> <span id="cm-tn">--</span> (Contaminadas correctas)</div>
-            <div>• <strong>Verdaderos positivos (TP):</strong> <span id="cm-tp">--</span> (Potables correctas)</div>
-            <div>• <strong>Falsos positivos (FP):</strong> <span id="cm-fp">--</span> (Contaminadas como potables)</div>
-            <div>• <strong>Falsos negativos (FN):</strong> <span id="cm-fn">--</span> (Potables como contaminadas)</div>
+            <div>• <strong>Verdaderos negativos (TN):</strong> <span id="cm-tn">790</span> (Contaminadas correctas)</div>
+            <div>• <strong>Verdaderos positivos (TP):</strong> <span id="cm-tp">798</span> (Potables correctas)</div>
+            <div>• <strong>Falsos positivos (FP):</strong> <span id="cm-fp">110</span> (Contaminadas como potables)</div>
+            <div>• <strong>Falsos negativos (FN):</strong> <span id="cm-fn">2</span> (Potables como contaminadas)</div>
           </div>
         </div>
       </div>
@@ -714,19 +714,19 @@
               <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
                 <div class="h2o-subbox" style="padding: 16px;">
                   <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Exactitud</span>
-                  <div id="metric-accuracy-val" style="font-size: 1.35rem; font-weight: 800; color: var(--text-title); margin-top: 4px;">--%</div>
+                  <div id="metric-accuracy-val" style="font-size: 1.35rem; font-weight: 800; color: var(--text-title); margin-top: 4px;">93.41%</div>
                 </div>
                 <div class="h2o-subbox" style="padding: 16px;">
                   <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Precisión</span>
-                  <div id="metric-precision-val" style="font-size: 1.35rem; font-weight: 800; color: var(--text-title); margin-top: 4px;">--%</div>
+                  <div id="metric-precision-val" style="font-size: 1.35rem; font-weight: 800; color: var(--text-title); margin-top: 4px;">87.89%</div>
                 </div>
                 <div class="h2o-subbox" style="padding: 16px;">
                   <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Recall</span>
-                  <div id="metric-recall-val" style="font-size: 1.35rem; font-weight: 800; color: var(--text-title); margin-top: 4px;">--%</div>
+                  <div id="metric-recall-val" style="font-size: 1.35rem; font-weight: 800; color: var(--text-title); margin-top: 4px;">99.75%</div>
                 </div>
                 <div class="h2o-subbox" style="padding: 16px;">
                   <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">F1-Score</span>
-                  <div id="metric-f1-val" style="font-size: 1.35rem; font-weight: 800; color: var(--text-title); margin-top: 4px;">--%</div>
+                  <div id="metric-f1-val" style="font-size: 1.35rem; font-weight: 800; color: var(--text-title); margin-top: 4px;">93.44%</div>
                 </div>
               </div>
               <button type="button" class="btn btn-primary" onclick="abrirModalMatriz()" style="width: 100%;">
@@ -1111,9 +1111,20 @@
     }
   </script>
 
-  <!-- Script: Gráficos H2O (Donas, Gauge y Matriz + Modal desde water_quality.csv) -->
+  <!-- Script: Gráficos H2O (Donas, Gauge y Matriz + Modal con valores exactos de Kevin) -->
   <script>
-    let ultimaMatrizH2O = [[69, 0], [1, 10]];
+    const METRICAS_OFICIALES_H2O = {
+      accuracy: "93.41%",
+      precision: "87.89%",
+      recall: "99.75%",
+      f1: "93.44%",
+      matriz: [
+        [790, 110],
+        [2, 798]
+      ]
+    };
+
+    let ultimaMatrizH2O = METRICAS_OFICIALES_H2O.matriz;
 
     function obtenerColoresTemaPlotly() {
       const esOscuro = (document.documentElement.getAttribute("data-theme") || "dark") === "dark";
@@ -1126,23 +1137,36 @@
       };
     }
 
+    function aplicarValoresMatrizEnUI() {
+      document.getElementById("metric-accuracy-val").innerText = METRICAS_OFICIALES_H2O.accuracy;
+      document.getElementById("metric-precision-val").innerText = METRICAS_OFICIALES_H2O.precision;
+      document.getElementById("metric-recall-val").innerText = METRICAS_OFICIALES_H2O.recall;
+      document.getElementById("metric-f1-val").innerText = METRICAS_OFICIALES_H2O.f1;
+
+      const mAcc = document.getElementById("modal-metric-accuracy");
+      const mPrec = document.getElementById("modal-metric-precision");
+      const mRec = document.getElementById("modal-metric-recall");
+      const mF1 = document.getElementById("modal-metric-f1");
+      if (mAcc) mAcc.innerText = METRICAS_OFICIALES_H2O.accuracy;
+      if (mPrec) mPrec.innerText = METRICAS_OFICIALES_H2O.precision;
+      if (mRec) mRec.innerText = METRICAS_OFICIALES_H2O.recall;
+      if (mF1) mF1.innerText = METRICAS_OFICIALES_H2O.f1;
+
+      const tn = document.getElementById("cm-tn");
+      const fp = document.getElementById("cm-fp");
+      const fn = document.getElementById("cm-fn");
+      const tp = document.getElementById("cm-tp");
+      if (tn) tn.innerText = METRICAS_OFICIALES_H2O.matriz[0][0];
+      if (fp) fp.innerText = METRICAS_OFICIALES_H2O.matriz[0][1];
+      if (fn) fn.innerText = METRICAS_OFICIALES_H2O.matriz[1][0];
+      if (tp) tp.innerText = METRICAS_OFICIALES_H2O.matriz[1][1];
+    }
+
     function abrirModalMatriz() {
       const modal = document.getElementById("matrizModal");
       if (!modal) return;
       modal.style.display = "flex";
-
-      document.getElementById("modal-metric-accuracy").innerText = document.getElementById("metric-accuracy-val").innerText;
-      document.getElementById("modal-metric-precision").innerText = document.getElementById("metric-precision-val").innerText;
-      document.getElementById("modal-metric-recall").innerText = document.getElementById("metric-recall-val").innerText;
-      document.getElementById("modal-metric-f1").innerText = document.getElementById("metric-f1-val").innerText;
-
-      if (Array.isArray(ultimaMatrizH2O) && ultimaMatrizH2O.length === 2) {
-        document.getElementById("cm-tn").innerText = ultimaMatrizH2O[0][0];
-        document.getElementById("cm-fp").innerText = ultimaMatrizH2O[0][1];
-        document.getElementById("cm-fn").innerText = ultimaMatrizH2O[1][0];
-        document.getElementById("cm-tp").innerText = ultimaMatrizH2O[1][1];
-      }
-
+      aplicarValoresMatrizEnUI();
       dibujarMatrizEnContenedor("heatmap-confusion-modal", ultimaMatrizH2O, 290);
       setTimeout(() => Plotly.Plots.resize("heatmap-confusion-modal"), 50);
     }
@@ -1163,6 +1187,8 @@
       });
 
       if (vista === "matriz") {
+        aplicarValoresMatrizEnUI();
+        dibujarMatrizH2O(ultimaMatrizH2O);
         setTimeout(() => Plotly.Plots.resize("heatmap-confusion"), 40);
         abrirModalMatriz();
       }
@@ -1266,7 +1292,7 @@
         height: alto,
         margin: { l: 105, r: 20, t: 18, b: 48 },
         xaxis: { title: "<b>Predicción</b>", color: c.textoSecundario },
-        yaxis: { title: "<b>Real</b>", color: c.textoSecundario },
+        yaxis: { title: "<b>Real</b>", color: c.textoSecundario, autorange: "reversed" },
         paper_bgcolor: "rgba(0,0,0,0)",
         plot_bgcolor: "rgba(0,0,0,0)"
       };
@@ -1283,24 +1309,11 @@
     }
 
     async function inicializarModuloH2O() {
+      aplicarValoresMatrizEnUI();
+      dibujarDonaH2O("donut-accuracy", 93.41, 100, "EFECTIVIDAD (%)", "#3b82f6", 1);
+      dibujarMatrizH2O(METRICAS_OFICIALES_H2O.matriz);
+
       try {
-        const resMetricas = await fetch("/api/ml/metricas");
-        const jsonMetricas = await resMetricas.json();
-
-        if (jsonMetricas && jsonMetricas.status === "success" && jsonMetricas.data) {
-          const d = jsonMetricas.data;
-          const acc = parseFloat(d.accuracy) || 0;
-          document.getElementById("metric-accuracy-val").innerText = `${acc}%`;
-          document.getElementById("metric-precision-val").innerText = `${d.precision}%`;
-          document.getElementById("metric-recall-val").innerText = `${d.recall}%`;
-          document.getElementById("metric-f1-val").innerText = `${d.f1}%`;
-
-          dibujarDonaH2O("donut-accuracy", acc, 100, "EFECTIVIDAD (%)", "#3b82f6", 1);
-          if (d.matriz_confusion && d.matriz_confusion.raw) {
-            dibujarMatrizH2O(d.matriz_confusion.raw);
-          }
-        }
-
         const resTel = await fetch("/api/telemetria");
         const tel = await resTel.json();
         const temp = parseFloat(tel.temperatura) || 24.5;
