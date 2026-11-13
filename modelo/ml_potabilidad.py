@@ -8,12 +8,26 @@ from sklearn.metrics import accuracy_score, confusion_matrix, precision_score, r
 _modelo = None
 _metricas = {}
 
+def _resolver_ruta_csv(csv_path: str) -> str:
+    rutas_posibles = [
+        csv_path,
+        "water_quality.csv",
+        os.path.join("modelo", "water_quality.csv"),
+        os.path.join(os.path.dirname(__file__), "water_quality.csv")
+    ]
+    for ruta in rutas_posibles:
+        if os.path.exists(ruta):
+            return ruta
+    return ""
+
 def inicializar_modelo_potabilidad(csv_path: str = "water_quality.csv"):
     global _modelo, _metricas
-    if not os.path.exists(csv_path):
+    ruta_real = _resolver_ruta_csv(csv_path)
+    if not ruta_real:
+        print("[ML Warning] No se encontró water_quality.csv en el servidor.")
         return None
 
-    df = pd.read_csv(csv_path)[["Temperature", "Turbidity", "Label"]].dropna()
+    df = pd.read_csv(ruta_real)[["Temperature", "Turbidity", "Label"]].dropna()
     df["Label"] = df["Label"].astype(int)
 
     X = df[["Temperature", "Turbidity"]]
@@ -24,9 +38,9 @@ def inicializar_modelo_potabilidad(csv_path: str = "water_quality.csv"):
     )
 
     clf = RandomForestClassifier(
-        n_estimators=100, 
-        random_state=42, 
-        max_depth=10, 
+        n_estimators=100,
+        random_state=42,
+        max_depth=10,
         class_weight="balanced"
     )
     clf.fit(X_train, y_train)
