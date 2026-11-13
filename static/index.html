@@ -413,7 +413,7 @@
       border-top: 1px solid var(--border-card);
     }
 
-    /* Modal de Inicio de Sesión con Google y Modales */
+    /* Modales */
     .login-modal-overlay {
       display: none;
       position: fixed;
@@ -451,7 +451,6 @@
         Inicia sesión con tu cuenta de Google para acceder al tablero de telemetría e inteligencia artificial.
       </p>
 
-      <!-- Contenedor donde Google Identity Services renderiza el botón -->
       <div id="googleBtnContainer" style="display: flex; justify-content: center; min-height: 44px; margin-bottom: 18px;"></div>
 
       <button type="button" onclick="bypassDesarrollo()" style="background: transparent; border: none; color: var(--text-muted); font-size: 0.78rem; text-decoration: underline; cursor: pointer;">
@@ -460,41 +459,56 @@
     </div>
   </div>
 
-  <!-- MODAL DE MATRIZ DE CONFUSIÓN AMPLIADA -->
+  <!-- MODAL DE MATRIZ DE CONFUSIÓN COMPLETA + ENLACE DATASET CSV -->
   <div id="matrizModal" class="login-modal-overlay" onclick="if(event.target===this) cerrarModalMatriz()">
-    <div class="login-modal-card" style="max-width: 760px; width: 95%; text-align: left; padding: 24px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-card); padding-bottom: 12px; margin-bottom: 18px;">
+    <div class="login-modal-card" style="max-width: 820px; width: 95%; text-align: left; padding: 24px; max-height: 92vh; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid var(--border-card); padding-bottom: 12px; margin-bottom: 16px; gap: 12px;">
         <div>
           <h3 style="color: var(--text-title); font-size: 1.15rem; font-weight: 700;">
-            📊 Matriz de Confusión Completa (Random Forest H2O)
+            📊 Matriz de Confusión Completa (water_quality.csv)
           </h3>
-          <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 2px;">
-            Comparación detallada entre valores reales y predicciones del modelo
+          <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 4px;">
+            Dataset oficial:
+            <a href="https://www.kaggle.com/datasets/vishnuverma1441/real-time-water-quality" target="_blank" rel="noopener" style="color: var(--accent-primary); font-weight: 600; text-decoration: underline;">
+              🔗 Kaggle: Real Time Water Quality (water_quality.csv) ↗
+            </a>
           </p>
         </div>
-        <button type="button" onclick="cerrarModalMatriz()" style="background: var(--btn-bg); border: 1px solid var(--border-card); color: var(--text-title); width: 32px; height: 32px; border-radius: 8px; cursor: pointer; font-weight: 700;">✕</button>
+        <button type="button" onclick="cerrarModalMatriz()" style="background: var(--btn-bg); border: 1px solid var(--border-card); color: var(--text-title); width: 32px; height: 32px; border-radius: 8px; cursor: pointer; font-weight: 700; flex-shrink: 0;">✕</button>
       </div>
 
-      <div class="h2o-subbox" style="padding: 12px; margin-bottom: 16px; overflow: hidden;">
-        <div id="heatmap-confusion-modal" style="width: 100%; height: 320px;"></div>
-      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 16px; align-items: center; margin-bottom: 16px;">
+        <div class="h2o-subbox" style="padding: 12px; overflow: hidden;">
+          <div id="heatmap-confusion-modal" style="width: 100%; height: 290px;"></div>
+        </div>
 
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px;">
-        <div class="h2o-subbox" style="padding: 12px;">
-          <span style="font-size: 0.68rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Exactitud</span>
-          <div id="modal-metric-accuracy" style="font-size: 1.2rem; font-weight: 800; color: var(--text-title); margin-top: 4px;">--%</div>
-        </div>
-        <div class="h2o-subbox" style="padding: 12px;">
-          <span style="font-size: 0.68rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Precisión</span>
-          <div id="modal-metric-precision" style="font-size: 1.2rem; font-weight: 800; color: var(--text-title); margin-top: 4px;">--%</div>
-        </div>
-        <div class="h2o-subbox" style="padding: 12px;">
-          <span style="font-size: 0.68rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Recall</span>
-          <div id="modal-metric-recall" style="font-size: 1.2rem; font-weight: 800; color: var(--text-title); margin-top: 4px;">--%</div>
-        </div>
-        <div class="h2o-subbox" style="padding: 12px;">
-          <span style="font-size: 0.68rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">F1-Score</span>
-          <div id="modal-metric-f1" style="font-size: 1.2rem; font-weight: 800; color: var(--text-title); margin-top: 4px;">--%</div>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div class="h2o-subbox" style="padding: 12px;">
+              <span style="font-size: 0.68rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Exactitud</span>
+              <div id="modal-metric-accuracy" style="font-size: 1.25rem; font-weight: 800; color: var(--text-title); margin-top: 4px;">--%</div>
+            </div>
+            <div class="h2o-subbox" style="padding: 12px;">
+              <span style="font-size: 0.68rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Precisión</span>
+              <div id="modal-metric-precision" style="font-size: 1.25rem; font-weight: 800; color: var(--text-title); margin-top: 4px;">--%</div>
+            </div>
+            <div class="h2o-subbox" style="padding: 12px;">
+              <span style="font-size: 0.68rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Recall</span>
+              <div id="modal-metric-recall" style="font-size: 1.25rem; font-weight: 800; color: var(--text-title); margin-top: 4px;">--%</div>
+            </div>
+            <div class="h2o-subbox" style="padding: 12px;">
+              <span style="font-size: 0.68rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">F1-Score</span>
+              <div id="modal-metric-f1" style="font-size: 1.25rem; font-weight: 800; color: var(--text-title); margin-top: 4px;">--%</div>
+            </div>
+          </div>
+
+          <div class="h2o-subbox" style="padding: 12px; text-align: left; font-size: 0.78rem; color: var(--text-body); line-height: 1.6;">
+            <strong style="color: var(--text-title); display: block; margin-bottom: 4px;">Interpretación del conjunto de prueba (20%):</strong>
+            <div>• <strong>Verdaderos negativos (TN):</strong> <span id="cm-tn">--</span> (Contaminadas correctas)</div>
+            <div>• <strong>Verdaderos positivos (TP):</strong> <span id="cm-tp">--</span> (Potables correctas)</div>
+            <div>• <strong>Falsos positivos (FP):</strong> <span id="cm-fp">--</span> (Contaminadas como potables)</div>
+            <div>• <strong>Falsos negativos (FN):</strong> <span id="cm-fn">--</span> (Potables como contaminadas)</div>
+          </div>
         </div>
       </div>
     </div>
@@ -627,7 +641,10 @@
               💧 Clasificación Binaria en Tiempo Real (Potable vs. Contaminada)
             </span>
             <p style="margin-top: 2px; font-size: 0.8rem; color: var(--text-muted);">
-              Evaluación supervisada con 100 árboles de decisión sobre temperatura y turbidez
+              Evaluación supervisada con 100 árboles de decisión • Dataset:
+              <a href="https://www.kaggle.com/datasets/vishnuverma1441/real-time-water-quality" target="_blank" rel="noopener" style="color: var(--accent-primary); text-decoration: underline;">
+                water_quality.csv (Kaggle) ↗
+              </a>
             </p>
           </div>
 
@@ -713,7 +730,7 @@
                 </div>
               </div>
               <button type="button" class="btn btn-primary" onclick="abrirModalMatriz()" style="width: 100%;">
-                🔍 Ampliar Matriz en Ventana Modal
+                🔍 Ver Matriz Completa y Dataset Kaggle
               </button>
             </div>
           </div>
@@ -1094,7 +1111,7 @@
     }
   </script>
 
-  <!-- Script: Gráficos H2O (Donas, Gauge y Matriz + Modal) adaptados al Tema Claro/Oscuro -->
+  <!-- Script: Gráficos H2O (Donas, Gauge y Matriz + Modal desde water_quality.csv) -->
   <script>
     let ultimaMatrizH2O = [[69, 0], [1, 10]];
 
@@ -1119,7 +1136,14 @@
       document.getElementById("modal-metric-recall").innerText = document.getElementById("metric-recall-val").innerText;
       document.getElementById("modal-metric-f1").innerText = document.getElementById("metric-f1-val").innerText;
 
-      dibujarMatrizEnContenedor("heatmap-confusion-modal", ultimaMatrizH2O, 320);
+      if (Array.isArray(ultimaMatrizH2O) && ultimaMatrizH2O.length === 2) {
+        document.getElementById("cm-tn").innerText = ultimaMatrizH2O[0][0];
+        document.getElementById("cm-fp").innerText = ultimaMatrizH2O[0][1];
+        document.getElementById("cm-fn").innerText = ultimaMatrizH2O[1][0];
+        document.getElementById("cm-tp").innerText = ultimaMatrizH2O[1][1];
+      }
+
+      dibujarMatrizEnContenedor("heatmap-confusion-modal", ultimaMatrizH2O, 290);
       setTimeout(() => Plotly.Plots.resize("heatmap-confusion-modal"), 50);
     }
 
@@ -1254,7 +1278,7 @@
       ultimaMatrizH2O = matrizRaw;
       dibujarMatrizEnContenedor("heatmap-confusion", matrizRaw, 240);
       if (document.getElementById("matrizModal")?.style.display === "flex") {
-        dibujarMatrizEnContenedor("heatmap-confusion-modal", matrizRaw, 320);
+        dibujarMatrizEnContenedor("heatmap-confusion-modal", matrizRaw, 290);
       }
     }
 
@@ -1398,12 +1422,10 @@
         if (!respuesta.ok) return;
         const telemetria = await respuesta.json();
 
-        // 1. Actualizar gráfico de barras (Índice de Calidad)
         if (telemetria && telemetria.estado) {
           renderizarBarrasEstado(telemetria.estado);
         }
 
-        // 2. Actualizar en tiempo real las donas de Temperatura y Turbidez
         if (telemetria && typeof Plotly !== "undefined") {
           const temp = parseFloat(telemetria.temperatura);
           const turb = parseFloat(telemetria.turbidez);
