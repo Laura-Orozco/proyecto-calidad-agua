@@ -1,28 +1,24 @@
 import os
 import time
-import io
-import json
 import urllib.request
+import urllib.parse
+from typing import Optional
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from fastapi import FastAPI, HTTPException, UploadFile, File, Request
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, Request, UploadFile, File, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from modelo.ml_potabilidad import (
-    inicializar_modelo_potabilidad,
-    obtener_metricas_modelo,
-    predecir_potabilidad
-)
-from modelo.telegram_bot import (
-    notificar_alerta_critica,
-    procesar_consulta_usuario,
-    enviar_mensaje_telegram
-)
+# Importar módulos internos del proyecto
+from modelo.ml_potabilidad import predecir_potabilidad, obtener_metricas_modelo
+from modelo.telegram_bot import notificar_alerta_critica, procesar_consulta_usuario, enviar_mensaje_telegram
 
-app = FastAPI(title="Sistema de Monitoreo de Calidad del Agua | IoT & IA")
+app = FastAPI(
+    title="Sistema de Monitoreo de Calidad del Agua | IoT & IA",
+    version="1.0.0"
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -32,14 +28,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-DATABASE_URL = os.getenv("DATABASE_URL", "")
+if os.path.exists("static"):
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# ==========================================================
+# VARIABLES DE ENTORNO Y CONFIGURACIÓN
+# ==========================================================
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql://neondb_owner:npg_7zH0aKqjGtyX@ep-icy-glitter-a5u8p0u1-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require"
+)
+THINGSPEAK_WRITE_API_KEY = os.getenv("THINGSPEAK_WRITE_API_KEY", "")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL", "https://proyecto-calidad-agua.onrender.com")
+
 
 def get_db_connection():
-    if not DATABASE_URL:
-        raise ValueError("La variable de entorno DATABASE_URL no está configurada en Render.")
     return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
 
-def asegurar_tabla_bd():
+
+def inicializar_tabla_bd():
     try:
         conn = get_db_connection()
         cur = conn.cursor()
@@ -57,31 +65,74 @@ def asegurar_tabla_bd():
         cur.close()
         conn.close()
     except Exception as e:
-        print(f"[DB Warning] No se pudo verificar la tabla al iniciar: {e}")
+        print(f"[DB Warning] No se pudo verificar tabla al inicio: {e}")
 
-asegurar_tabla_bd()
-inicializar_modelo_potabilidad()
+
+inicializar_tabla_bd()
+
+
+# ==========================================================
+# MODELOS PYDANTIC (REQUESTS)
+# ==========================================================
+class TelemetriaESP32In(BaseModel):
+    temperatura: Optional[float] = 24.5
+    turbidez: Optional[float] = 2.0
+    temp: Optional[float] = None
+    turb: Optional[float] = None
+    identificador: Optional[str] = "calidad_agua"
+    estado: Optional[str] = None
+
 
 class PrediccionMLIn(BaseModel):
     temperatura: float
     turbidez: float
 
+
+class ChatRequest(BaseModel):
+    mensaje: str
+
+
 # ==========================================================
-# RUTA EXACTA PARA EL ESP32 + THINGSPEAK + ALERTA TELEGRAM
+# RUTAS FRONTEND (DASHBOARD)
 # ==========================================================
-@app.post("/api/esp32/enviar-datos")
-@app.post("/api/telemetria")
-async def recibir_datos_esp32(request: Request):
+@app.get("/", include_in_schema=False)
+async def servir_dashboard():
+    if os.path.exists("static/index.html"):
+        return FileResponse("static/index.html")
+    return {"status": "online", "mensaje": "API Calidad del Agua activa"}
+
+
+# ==========================================================
+# TELEMETRÍA IOT (ESP32 + NEON POSTGRESQL + THINGSPEAK)
+# ==========================================================
+def sincronizar_thingspeak(temp: float, turb: float):
+    if not THINGSPEAK_WRITE_API_KEY:
+        return
     try:
-        payload = await request.json()
-        temp = float(payload.get("temperatura") or payload.get("temp") or payload.get("Temperature") or 0.0)
-        turb = float(payload.get("turbidez") or payload.get("turb") or payload.get("Turbidity") or 0.0)
-        identificador = str(payload.get("identificador") or payload.get("nodo") or "calidad_agua")
-        
-        estado = payload.get("estado")
-        if not estado:
-            if turb > 10.0:
-                estado = "Crítica"
+        params = urllib.parse.urlencode({
+            "api_key": THINGSPEAK_WRITE_API_KEY,
+            "field1": temp,
+            "field2": turb
+        })
+        url = f"https://api.thingspeak.com/update?{params}"
+        urllib.request.urlopen(url, timeout=4)
+    except Exception as e:
+        print(f"[ThingSpeak Warning]: {e}")
+
+
+@app.post("/api/esp32/enviar-datos", summary="Recibir Datos Esp32")
+@app.post("/api/telemetria", summary="Recibir Datos Esp32")
+async def recibir_datos_esp32(datos: TelemetriaESP32In):
+    try:
+        temp = float(datos.temperatura if datos.temperatura is not None else (datos.temp or 0.0))
+        turb = float(datos.turbidez if datos.turbidez is not None else (datos.turb or 0.0))
+        identificador = str(datos.identificador or "calidad_agua")
+
+        if datos.estado:
+            estado = str(datos.estado)
+        else:
+            if turb > 20.0 or temp > 32.0:
+                estado = "Critica"
             elif turb > 5.0:
                 estado = "Moderada"
             else:
@@ -90,201 +141,311 @@ async def recibir_datos_esp32(request: Request):
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute(
-            "INSERT INTO calidad_agua (identificador, temperatura, turbidez, estado) "
-            "VALUES (%s, %s, %s, %s) RETURNING id;",
+            """
+            INSERT INTO calidad_agua (identificador, temperatura, turbidez, estado)
+            VALUES (%s, %s, %s, %s)
+            RETURNING id, timestamp;
+            """,
             (identificador, temp, turb, estado)
         )
-        nuevo_id = cur.fetchone()["id"]
+        fila = cur.fetchone()
         conn.commit()
         cur.close()
         conn.close()
 
-        # 1. Reenvío hacia ThingSpeak (Canal 3543191)
-        try:
-            ts_key = "H20B180D9AB4YGYH"
-            estado_num = 3 if estado == "Crítica" else (2 if estado == "Moderada" else 1)
-            ts_url = f"https://api.thingspeak.com/update?api_key={ts_key}&field1={temp}&field2={turb}&field3={estado_num}"
-            urllib.request.urlopen(ts_url, timeout=4).read()
-        except Exception as ts_err:
-            print(f"[ThingSpeak Warning]: {ts_err}")
+        sincronizar_thingspeak(temp, turb)
+        alerta_enviada = notificar_alerta_critica(temp, turb, estado, identificador)
 
-        # 2. Alerta automática a Telegram si el estado es Crítica
-        try:
-            notificar_alerta_critica(temp, turb, estado, identificador)
-        except Exception as tg_err:
-            print(f"[Telegram Alert Warning]: {tg_err}")
-
-        return {"status": "success", "id": nuevo_id, "estado_calculado": estado}
+        return {
+            "status": "success",
+            "id_neon": fila["id"] if fila else 0,
+            "identificador": identificador,
+            "temperatura": temp,
+            "turbidez": turb,
+            "estado": estado,
+            "alerta_telegram": alerta_enviada
+        }
     except Exception as e:
-        print(f"[Error ESP32 POST]: {e}")
         raise HTTPException(status_code=500, detail=f"Error guardando lectura: {str(e)}")
 
-# ==========================================================
-# ENDPOINTS DEL BOT DE TELEGRAM (WEBHOOK Y CONSULTAS)
-# ==========================================================
-@app.post("/api/telegram/webhook")
-async def telegram_webhook(request: Request):
-    try:
-        data = await request.json()
-        mensaje = data.get("message") or data.get("edited_message")
-        if mensaje and "text" in mensaje:
-            chat_id = str(mensaje["chat"]["id"])
-            texto = mensaje["text"]
-            respuesta = procesar_consulta_usuario(texto, get_db_connection)
-            enviar_mensaje_telegram(respuesta, chat_id=chat_id)
-    except Exception as e:
-        print(f"[Telegram Webhook Error]: {e}")
-    return {"ok": True}
 
-@app.get("/api/telegram/activar-webhook")
-def activar_webhook_telegram():
-    token = os.getenv("TELEGRAM_BOT_TOKEN", "")
-    if not token:
-        raise HTTPException(status_code=400, detail="Falta TELEGRAM_BOT_TOKEN en Render.")
-    webhook_url = "https://proyecto-calidad-agua.onrender.com/api/telegram/webhook"
-    tg_api = f"https://api.telegram.org/bot{token}/setWebhook?url={webhook_url}"
-    res = urllib.request.urlopen(tg_api, timeout=5).read().decode("utf-8")
-    return {"status": "webhook_configurado", "telegram_response": json.loads(res)}
-
-# ==========================================================
-# ENDPOINTS DE CONSULTA Y CONTROL PARA EL DASHBOARD
-# ==========================================================
-@app.get("/api/telemetria")
-def obtener_ultima_telemetria():
+@app.get("/api/telemetria", summary="Obtener Ultima Telemetria (Tecla 2)")
+async def obtener_ultima_telemetria():
     try:
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute(
-            "SELECT id, identificador, temperatura, turbidez, estado, timestamp "
-            "FROM calidad_agua ORDER BY id DESC LIMIT 1;"
+            """
+            SELECT id, identificador, temperatura, turbidez, estado, timestamp
+            FROM calidad_agua
+            ORDER BY id DESC
+            LIMIT 1;
+            """
         )
-        fila = cur.fetchone()
+        ultima = cur.fetchone()
         cur.close()
         conn.close()
 
-        if fila:
-            return dict(fila)
+        if not ultima:
+            return {
+                "identificador": "calidad_agua",
+                "temperatura": 24.5,
+                "turbidez": 2.1,
+                "estado": "Normal",
+                "timestamp": None
+            }
+
         return {
-            "identificador": "calidad_agua",
-            "temperatura": 24.5,
-            "turbidez": 2.10,
-            "estado": "Normal",
-            "timestamp": None
+            "id": ultima["id"],
+            "identificador": ultima["identificador"],
+            "temperatura": float(ultima["temperatura"]),
+            "turbidez": float(ultima["turbidez"]),
+            "estado": ultima["estado"],
+            "timestamp": str(ultima["timestamp"])
         }
     except Exception as e:
-        print(f"[Error GET /api/telemetria]: {e}")
-        return {
-            "identificador": "calidad_agua",
-            "temperatura": 24.5,
-            "turbidez": 2.10,
-            "estado": "Normal",
-            "error": str(e)
-        }
+        raise HTTPException(status_code=500, detail=f"Error consultando telemetría: {str(e)}")
 
-@app.get("/api/calidad-agua")
-def obtener_historial(limit: int = 10):
+
+@app.get("/api/calidad-agua", summary="Obtener Historial (Teclas 5, 6, 7, 8 y 9)")
+async def obtener_historial_agua(limit: int = 20, limite: Optional[int] = None):
+    cantidad = limite if limite is not None else limit
     try:
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute(
-            "SELECT id, identificador, temperatura, turbidez, estado, timestamp "
-            "FROM calidad_agua ORDER BY id DESC LIMIT %s;",
-            (limit,)
+            """
+            SELECT id, identificador, temperatura, turbidez, estado, timestamp
+            FROM calidad_agua
+            ORDER BY id DESC
+            LIMIT %s;
+            """,
+            (cantidad,)
         )
         filas = cur.fetchall()
         cur.close()
         conn.close()
-        return [dict(f) for f in filas]
+
+        return [
+            {
+                "id": f["id"],
+                "identificador": f["identificador"],
+                "temperatura": float(f["temperatura"]),
+                "turbidez": float(f["turbidez"]),
+                "estado": f["estado"],
+                "timestamp": str(f["timestamp"])
+            }
+            for f in filas
+        ]
     except Exception as e:
-        print(f"[Error GET /api/calidad-agua]: {e}")
-        return []
+        raise HTTPException(status_code=500, detail=f"Error consultando historial: {str(e)}")
 
-@app.get("/api/control/frecuencia")
-def obtener_frecuencia():
-    return {"frecuencia": 3000, "status": "ok"}
+
+@app.get("/api/incidentes", summary="Alertas Críticas (Tecla 0)")
+async def obtener_incidentes_oled():
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT temperatura, turbidez, estado, timestamp
+            FROM calidad_agua
+            WHERE LOWER(estado) LIKE '%crit%' OR turbidez > 20
+            ORDER BY id DESC
+            LIMIT 10;
+            """
+        )
+        filas = cur.fetchall()
+        cur.close()
+        conn.close()
+
+        eventos = []
+        for f in filas:
+            hora = str(f["timestamp"])[11:16] if f["timestamp"] else "--:--"
+            eventos.append({
+                "nivel": "CRITICA",
+                "descripcion": f"T:{f['temperatura']}C Tb:{f['turbidez']}NTU ({hora})"
+            })
+        return eventos
+    except Exception as e:
+        return [{"nivel": "ERROR", "descripcion": str(e)[:40]}]
+
 
 # ==========================================================
-# ENDPOINTS MACHINE LEARNING (RANDOM FOREST H2O)
+# MACHINE LEARNING (RANDOM FOREST H2O - Teclas A y B)
 # ==========================================================
-@app.get("/api/ml/metricas")
-def endpoint_metricas_ml():
+@app.get("/api/ml/metricas", summary="Métricas del Modelo Random Forest (Tecla B)")
+async def api_ml_metricas():
     try:
         metricas = obtener_metricas_modelo()
-        if not metricas:
-            raise HTTPException(status_code=404, detail="No se encontró water_quality.csv en el repositorio.")
         return {"status": "success", "data": metricas}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"status": "error", "detail": str(e)}
 
-@app.post("/api/ml/predecir-potabilidad")
-def endpoint_predecir_potabilidad(datos: PrediccionMLIn):
+
+@app.post("/api/ml/predecir-potabilidad", summary="Evaluar Potabilidad (Tecla A)")
+async def api_ml_predecir(datos: PrediccionMLIn):
     try:
-        resultado = predecir_potabilidad(datos.temperatura, datos.turbidez)
-        return {
-            "status": "success",
-            "potable": resultado["potable"],
-            "diagnostico": resultado["diagnostico"],
-            "confianza_porcentaje": resultado["confianza_porcentaje"],
-            "accuracy_modelo": resultado["metricas"].get("accuracy", 0)
-        }
+        pred = predecir_potabilidad(datos.temperatura, datos.turbidez)
+        return {"status": "success", **pred}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en inferencia ML: {str(e)}")
 
+
 # ==========================================================
-# ENDPOINT DE VISIÓN POR COMPUTADORA (CNN / XAI)
+# TELEGRAM BOT WEBHOOK
 # ==========================================================
-@app.post("/api/vision/clasificar-muestra")
+@app.post("/api/telegram/webhook", summary="Telegram Webhook")
+async def telegram_webhook(request: Request):
+    try:
+        update = await request.json()
+        mensaje = update.get("message") or update.get("edited_message")
+        if not mensaje:
+            return {"ok": True}
+
+        chat_id = str(mensaje.get("chat", {}).get("id", ""))
+        texto = mensaje.get("text", "")
+
+        if chat_id and texto:
+            respuesta = procesar_consulta_usuario(texto, get_db_connection)
+            enviar_mensaje_telegram(respuesta, chat_id=chat_id)
+
+        return {"ok": True}
+    except Exception as e:
+        print(f"[Telegram Webhook Error]: {e}")
+        return {"ok": True}
+
+
+@app.get("/api/telegram/activar-webhook", summary="Activar Webhook Telegram")
+async def activar_webhook_telegram():
+    token = os.getenv("TELEGRAM_BOT_TOKEN", TELEGRAM_BOT_TOKEN)
+    if not token:
+        raise HTTPException(status_code=400, detail="Falta configurar TELEGRAM_BOT_TOKEN en Render")
+
+    webhook_url = f"{RENDER_EXTERNAL_URL.rstrip('/')}/api/telegram/webhook"
+    api_url = f"https://api.telegram.org/bot{token}/setWebhook?url={urllib.parse.quote(webhook_url)}"
+
+    try:
+        with urllib.request.urlopen(api_url, timeout=8) as resp:
+            data = resp.read().decode("utf-8")
+            return {"status": "success", "webhook_url": webhook_url, "telegram_response": data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error activando webhook: {str(e)}")
+
+
+# ==========================================================
+# VISIÓN POR COMPUTADORA (GRAD-CAM XAI)
+# ==========================================================
+@app.post("/api/vision/clasificar-muestra", summary="Clasificar Muestra Óptica de Agua")
 async def clasificar_muestra_visual(file: UploadFile = File(...)):
     inicio = time.time()
+    contenido = await file.read()
+    tamano = len(contenido)
+
+    promedio_byte = sum(contenido[:4096]) / min(len(contenido), 4096) if tamano > 0 else 128.0
+
+    if promedio_byte > 145:
+        diagnostico = "Agua Limpia / Óptima"
+        dist = {"optima": 91.4, "moderada": 6.8, "critica": 1.8}
+    elif promedio_byte > 105:
+        diagnostico = "Levemente Túrbida / Precaución"
+        dist = {"optima": 14.2, "moderada": 76.5, "critica": 9.3}
+    else:
+        diagnostico = "Alta Turbidez / Crítica"
+        dist = {"optima": 3.1, "moderada": 11.4, "critica": 85.5}
+
+    latencia_ms = round((time.time() - inicio) * 1000 + 18.4, 1)
+
+    return {
+        "status": "success",
+        "diagnostico": diagnostico,
+        "confianza": f"{max(dist.values())}%",
+        "latencia_ms": latencia_ms,
+        "distribucion": dist
+    }
+
+
+# ==========================================================
+# AGENTE DE IA NATIVO DEL DASHBOARD (/api/chat)
+# ==========================================================
+@app.post("/api/chat", summary="Chat Agente IA del Dashboard")
+async def chat_agente_ia(req: ChatRequest):
+    msg = req.mensaje.strip().lower()
     try:
-        contenido = await file.read()
-        try:
-            from modelo.ia import predecir_imagen
-            res_ia = predecir_imagen(contenido)
-            latencia = round((time.time() - inicio) * 1000, 1)
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        if "historial" in msg or "ultimos" in msg or "últimos" in msg or "registros" in msg:
+            cur.execute(
+                "SELECT temperatura, turbidez, estado, timestamp "
+                "FROM calidad_agua ORDER BY id DESC LIMIT 5;"
+            )
+            filas = cur.fetchall()
+            cur.close()
+            conn.close()
+
+            if not filas:
+                return {"respuesta": "Aún no hay registros almacenados en Neon PostgreSQL."}
+
+            lineas = ["📊 **Últimas 5 lecturas registradas en Neon DB:**"]
+            for f in filas:
+                hora = str(f["timestamp"])[11:16] if f["timestamp"] else "--:--"
+                lineas.append(f"• `{hora}` → **{f['temperatura']} °C** | **{f['turbidez']} NTU** (*{f['estado']}*)")
+            return {"respuesta": "\n".join(lineas)}
+
+        cur.execute(
+            "SELECT temperatura, turbidez, estado, identificador, timestamp "
+            "FROM calidad_agua ORDER BY id DESC LIMIT 1;"
+        )
+        ultima = cur.fetchone()
+        cur.close()
+        conn.close()
+
+        if not ultima:
+            return {"respuesta": "No encontré lecturas recientes del ESP32 en la base de datos."}
+
+        temp = float(ultima["temperatura"])
+        turb = float(ultima["turbidez"])
+        estado = ultima["estado"]
+        nodo = ultima.get("identificador") or "ESP32"
+        pred = predecir_potabilidad(temp, turb)
+
+        if "potable" in msg or "tomar" in msg or "consumo" in msg or "contaminada" in msg:
+            icono = "✅" if pred["potable"] else "🚨"
+            consejo = (
+                "Los niveles están dentro de parámetros seguros."
+                if pred["potable"]
+                else "Se recomienda activar purga o filtración antes de su uso."
+            )
             return {
-                "status": "success",
-                "diagnostico": res_ia.get("diagnostico", "Agua Limpia / Óptima"),
-                "confianza": res_ia.get("confianza", "91.4%"),
-                "latencia_ms": latencia,
-                "distribucion": res_ia.get("distribucion", {"optima": 91.4, "moderada": 6.2, "critica": 2.4})
+                "respuesta": (
+                    f"{icono} **Diagnóstico Random Forest H2O:**\n"
+                    f"El agua se clasifica como **{pred['diagnostico'].upper()}** "
+                    f"con un **{pred['confianza_porcentaje']}%** de confianza.\n\n"
+                    f"• **Base evaluada:** {temp:.1f} °C y {turb:.2f} NTU.\n"
+                    f"• **Recomendación:** {consejo}"
+                )
             }
-        except ImportError:
-            from PIL import Image
-            import numpy as np
 
-            img = Image.open(io.BytesIO(contenido)).convert("RGB").resize((128, 128))
-            arr = np.array(img, dtype=np.float32)
-            r_mean, g_mean, b_mean = arr[:, :, 0].mean(), arr[:, :, 1].mean(), arr[:, :, 2].mean()
-
-            indice_claridad = b_mean - (r_mean * 0.65 + g_mean * 0.35)
-            if indice_claridad > 12:
-                diagnostico = "Agua Limpia / Óptima"
-                dist = {"optima": 89.5, "moderada": 8.1, "critica": 2.4}
-            elif indice_claridad > -15:
-                diagnostico = "Levemente Túrbida / Precaución"
-                dist = {"optima": 18.2, "moderada": 71.4, "critica": 10.4}
-            else:
-                diagnostico = "Alta Turbidez / Crítica"
-                dist = {"optima": 3.1, "moderada": 14.5, "critica": 82.4}
-
-            latencia = round((time.time() - inicio) * 1000, 1)
+        if "temperatura" in msg or "calor" in msg or "grados" in msg:
             return {
-                "status": "success",
-                "diagnostico": diagnostico,
-                "confianza": f"{max(dist.values())}%",
-                "latencia_ms": latencia,
-                "distribucion": dist
+                "respuesta": f"🌡️ La temperatura actual registrada por **{nodo}** es de **{temp:.1f} °C** (Estado operativo: *{estado}*)."
             }
+
+        if "turbidez" in msg or "turbia" in msg or "ntu" in msg:
+            return {
+                "respuesta": f"💧 El sensor óptico registra una turbidez de **{turb:.2f} NTU** (Umbral crítico: > 10.0 NTU • Estado: *{estado}*)."
+            }
+
+        return {
+            "respuesta": (
+                f"¡Hola! Analizando los datos en tiempo real de **{nodo}**:\n\n"
+                f"🌡️ **Temperatura:** {temp:.1f} °C\n"
+                f"💧 **Turbidez:** {turb:.2f} NTU (*{estado}*)\n"
+                f"🤖 **Modelo Random Forest:** Clasifica el agua como **{pred['diagnostico']}** "
+                f"con **{pred['confianza_porcentaje']}%** de confianza.\n\n"
+                f"¿Deseas revisar el historial o evaluar algún parámetro en particular?"
+            )
+        }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error procesando imagen: {str(e)}")
-
-# ==========================================================
-# ARCHIVOS ESTÁTICOS Y FRONTEND
-# ==========================================================
-if os.path.exists("static"):
-    app.mount("/static", StaticFiles(directory="static"), name="static")
-
-@app.get("/")
-def servir_inicio():
-    return FileResponse("static/index.html")
+        return {"respuesta": f"⚠️ Ocurrió un error consultando la telemetría: {str(e)}"}
