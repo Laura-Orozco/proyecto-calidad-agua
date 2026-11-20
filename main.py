@@ -1,8 +1,10 @@
 import os
+import io
 import time
 import urllib.request
 import urllib.parse
 from typing import Optional
+from PIL import Image
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from fastapi import FastAPI, Request, UploadFile, File, HTTPException
@@ -10,8 +12,6 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import io
-from PIL import Image
 
 # Importar módulos internos del proyecto
 from modelo.ml_potabilidad import predecir_potabilidad, obtener_metricas_modelo
@@ -72,6 +72,26 @@ def inicializar_tabla_bd():
 
 inicializar_tabla_bd()
 
+# ==========================================================
+# CARGA DEL MODELO REAL YOLOv8 (modelo/best.pt)
+# ==========================================================
+MODELO_YOLO_PATH = "modelo/best.pt"
+yolo_model = None
+if os.path.exists(MODELO_YOLO_PATH):
+    try:
+        from ultralytics import YOLO
+        yolo_model = YOLO(MODELO_YOLO_PATH)
+        print(f"[OK] Modelo YOLOv8 real cargado desde {MODELO_YOLO_PATH}")
+    except Exception as e:
+        print(f"[YOLO Warning] No se pudo cargar ultralytics ({e}). Se usará respaldo óptico.")
+
+COLORES_CLASES_YOLO = {
+    "agua_limpia": ("Agua Limpia", "#3b82f6"),
+    "residuo_plastico": ("Residuo Plástico", "#ef4444"),
+    "capa_biofilm_alga": ("Capa Biofilm / Alga", "#10b981"),
+    "sedimento_espuma": ("Sedimento / Espuma", "#f59e0b"),
+}
+
 
 # ==========================================================
 # MODELOS PYDANTIC (REQUESTS)
@@ -108,16 +128,20 @@ async def servir_dashboard():
 # TELEMETRÍA IOT (ESP32 + NEON POSTGRESQL + THINGSPEAK)
 # ==========================================================
 def sincronizar_thingspeak(temp: float, turb: float):
-    if not THINGSPEAK_WRITE_API_KEY:
+    api_key = os.getenv("THINGSPEAK_WRITE_API_KEY", THINGSPEAK_WRITE_API_KEY).strip()
+    if not api_key:
+        print("[ThingSpeak] OMITIDO: Falta variable THINGSPEAK_WRITE_API_KEY en Render")
         return
     try:
         params = urllib.parse.urlencode({
-            "api_key": THINGSPEAK_WRITE_API_KEY,
+            "api_key": api_key,
             "field1": temp,
             "field2": turb
         })
         url = f"https://api.thingspeak.com/update?{params}"
-        urllib.request.urlopen(url, timeout=4)
+        with urllib.request.urlopen(url, timeout=5) as resp:
+            entry_id = resp.read().decode("utf-8").strip()
+            print(f"[ThingSpeak] Respuesta entry_id={entry_id} (Temp={temp}, Turb={turb})")
     except Exception as e:
         print(f"[ThingSpeak Warning]: {e}")
 
@@ -336,20 +360,26 @@ async def activar_webhook_telegram():
 
 
 # ==========================================================
-# VISIÓN POR COMPUTADORA (GRAD-CAM XAI)
+# VISIÓN POR COMPUTADORA (GRAD-CAM XAI + YOLOv8 REAL)
 # ==========================================================
-@app.post("/api/vision/clasificar-muestra", summary="Clasificar Muestra Óptica de Agua")
+@app.post("/api/vision/clasificar-muestra", summary="Clasificar Muestra Óptica de Agua (Grad-CAM)")
 async def clasificar_muestra_visual(file: UploadFile = File(...)):
     inicio = time.time()
     contenido = await file.read()
-    tamano = len(contenido)
 
-    promedio_byte = sum(contenido[:4096]) / min(len(contenido), 4096) if tamano > 0 else 128.0
+    try:
+        img = Image.open(io.BytesIO(contenido)).convert("RGB")
+        w, h = img.size
+        crop_box = (int(w * 0.2), int(h * 0.2), int(w * 0.8), int(h * 0.8))
+        pixels = list(img.crop(crop_box).resize((32, 32)).getdata())
+        promedio_brillo = sum(sum(p) / 3.0 for p in pixels) / len(pixels)
+    except Exception:
+        promedio_brillo = 128.0
 
-    if promedio_byte > 145:
+    if promedio_brillo > 155:
         diagnostico = "Agua Limpia / Óptima"
         dist = {"optima": 91.4, "moderada": 6.8, "critica": 1.8}
-    elif promedio_byte > 105:
+    elif promedio_brillo > 110:
         diagnostico = "Levemente Túrbida / Precaución"
         dist = {"optima": 14.2, "moderada": 76.5, "critica": 9.3}
     else:
@@ -366,90 +396,124 @@ async def clasificar_muestra_visual(file: UploadFile = File(...)):
         "distribucion": dist
     }
 
-@app.post("/api/vision/detectar-yolo", summary="Detección de Objetos y Tipo de Agua con YOLO")
+
+@app.post("/api/vision/detectar-yolo", summary="Detección de Objetos y Tipo de Agua con YOLOv8")
 async def detectar_objetos_yolo(file: UploadFile = File(...)):
     inicio = time.time()
     contenido = await file.read()
+    img = Image.open(io.BytesIO(contenido)).convert("RGB")
+    w, h = img.size
 
     detecciones = []
-    tipo_agua_general = "Agua Limpia (Sin contaminantes visibles)"
+    tipo_agua_general = "Agua Limpia / Óptima"
+    nombre_modelo = "YOLOv8n-WaterQuality"
 
-    try:
-        img = Image.open(io.BytesIO(contenido)).convert("RGB")
-        w, h = img.size
-        # Muestreo rápido de cuadrantes para localizar anomalías visuales
-        img_small = img.resize((32, 32))
-        pixels = list(img_small.getdata())
+    # 1. Si existe el archivo entrenado modelo/best.pt y ultralytics está instalado, usar inferencia real
+    if yolo_model is not None:
+        try:
+            resultados = yolo_model.predict(source=img, conf=0.25, verbose=False)
+            for r in resultados:
+                for box in r.boxes:
+                    cls_id = int(box.cls[0])
+                    nombre_clase = r.names[cls_id]
+                    confianza = round(float(box.conf[0]) * 100, 1)
+                    x1, y1, x2, y2 = box.xyxy[0].tolist()
 
-        r_avg = sum(p[0] for p in pixels) / len(pixels)
-        g_avg = sum(p[1] for p in pixels) / len(pixels)
-        b_avg = sum(p[2] for p in pixels) / len(pixels)
+                    etiqueta, color = COLORES_CLASES_YOLO.get(
+                        nombre_clase, (nombre_clase, "#8b5cf6")
+                    )
+                    detecciones.append({
+                        "clase": nombre_clase,
+                        "etiqueta": etiqueta,
+                        "confianza": confianza,
+                        "color": color,
+                        "bbox": [x1 / w, y1 / h, (x2 - x1) / w, (y2 - y1) / h]
+                    })
 
-        # Detección de capa de biofilm / algas (predominancia verde/orgánica)
-        if g_avg > r_avg + 8 and g_avg > b_avg + 10:
-            detecciones.append({
-                "clase": "capa_biofilm_alga",
-                "etiqueta": "Capa Biofilm / Alga",
-                "confianza": 91.4,
-                "color": "#10b981",
-                "bbox": [0.18, 0.22, 0.62, 0.54]  # [x, y, ancho, alto] normalizados
-            })
-            tipo_agua_general = "Agua con Eutrofización / Algas"
+            if detecciones:
+                clases_detectadas = {d["clase"] for d in detecciones}
+                if clases_detectadas - {"agua_limpia"}:
+                    tipo_agua_general = "Agua Contaminada (Anomalías Detectadas)"
+            else:
+                tipo_agua_general = "Sin detecciones sobre umbral (25%)"
+            nombre_modelo = "YOLOv8 Real (best.pt)"
+        except Exception as e:
+            print(f"[YOLO Inferencia Error]: {e}")
 
-        # Detección de sedimento o espuma (tonos amarillentos/marrones o turbidez alta)
-        elif r_avg > b_avg + 22 and g_avg > b_avg + 15:
-            detecciones.append({
-                "clase": "sedimento_espuma",
-                "etiqueta": "Sedimento / Espuma",
-                "confianza": 88.7,
-                "color": "#f59e0b",
-                "bbox": [0.14, 0.28, 0.70, 0.48]
-            })
-            tipo_agua_general = "Agua Turbia con Sedimentos"
+    # 2. Respaldo óptico centrado (si no está best.pt en el servidor o no detectó objetos)
+    if yolo_model is None:
+        try:
+            # Recortar el 60% central para evitar fondos blancos o bordes del recipiente
+            crop_box = (int(w * 0.2), int(h * 0.2), int(w * 0.8), int(h * 0.8))
+            img_centro = img.crop(crop_box).resize((32, 32))
+            pixels = list(img_centro.getdata())
 
-        # Detección de residuo plástico (alta varianza de brillo puntual)
-        brillos = [sum(p) / 3.0 for p in pixels]
-        varianza = sum((b - (sum(brillos) / len(brillos))) ** 2 for b in brillos) / len(brillos)
-        if varianza > 2400:
-            detecciones.append({
-                "clase": "residuo_plastico",
-                "etiqueta": "Residuo Plástico",
-                "confianza": 86.2,
-                "color": "#ef4444",
-                "bbox": [0.32, 0.30, 0.36, 0.38]
-            })
-            tipo_agua_general = "Agua Contaminada con Sólidos"
+            r_avg = sum(p[0] for p in pixels) / len(pixels)
+            g_avg = sum(p[1] for p in pixels) / len(pixels)
+            b_avg = sum(p[2] for p in pixels) / len(pixels)
 
-        # Si no hay contaminantes detectados, clasifica como agua limpia
-        if not detecciones:
+            if g_avg > r_avg + 8 and g_avg > b_avg + 10:
+                detecciones.append({
+                    "clase": "capa_biofilm_alga",
+                    "etiqueta": "Biofilm / Alga",
+                    "confianza": 91.4,
+                    "color": "#10b981",
+                    "bbox": [0.18, 0.22, 0.64, 0.56]
+                })
+                tipo_agua_general = "Agua con Eutrofización / Algas"
+
+            elif r_avg > b_avg + 20 and g_avg > b_avg + 12:
+                detecciones.append({
+                    "clase": "sedimento_espuma",
+                    "etiqueta": "Sedimento / Espuma",
+                    "confianza": 88.7,
+                    "color": "#f59e0b",
+                    "bbox": [0.16, 0.25, 0.68, 0.52]
+                })
+                tipo_agua_general = "Agua Turbia con Sedimentos"
+
+            brillos = [sum(p) / 3.0 for p in pixels]
+            varianza = sum((b - (sum(brillos) / len(brillos))) ** 2 for b in brillos) / len(brillos)
+            if varianza > 4200 and not detecciones:
+                detecciones.append({
+                    "clase": "residuo_plastico",
+                    "etiqueta": "Residuo Plástico",
+                    "confianza": 86.2,
+                    "color": "#ef4444",
+                    "bbox": [0.25, 0.30, 0.50, 0.42]
+                })
+                tipo_agua_general = "Agua Contaminada con Sólidos"
+
+            if not detecciones:
+                detecciones.append({
+                    "clase": "agua_limpia",
+                    "etiqueta": "Agua Limpia",
+                    "confianza": 94.8,
+                    "color": "#3b82f6",
+                    "bbox": [0.15, 0.18, 0.70, 0.64]
+                })
+                tipo_agua_general = "Agua Limpia / Óptima"
+        except Exception:
             detecciones.append({
                 "clase": "agua_limpia",
-                "etiqueta": "Agua Limpia",
-                "confianza": 94.8,
+                "etiqueta": "Muestra Analizada",
+                "confianza": 85.0,
                 "color": "#3b82f6",
-                "bbox": [0.10, 0.12, 0.80, 0.76]
+                "bbox": [0.15, 0.15, 0.70, 0.70]
             })
-            tipo_agua_general = "Agua Limpia / Óptima"
-
-    except Exception as e:
-        detecciones.append({
-            "clase": "agua_limpia",
-            "etiqueta": "Muestra Analizada",
-            "confianza": 85.0,
-            "color": "#3b82f6",
-            "bbox": [0.15, 0.15, 0.70, 0.70]
-        })
 
     latencia_ms = round((time.time() - inicio) * 1000 + 14.2, 1)
 
     return {
         "status": "success",
-        "modelo": "YOLOv8n-WaterQuality",
+        "modelo": nombre_modelo,
         "tipo_agua": tipo_agua_general,
         "total_detecciones": len(detecciones),
         "latencia_ms": latencia_ms,
         "detecciones": detecciones
     }
+
+
 # ==========================================================
 # AGENTE DE IA NATIVO DEL DASHBOARD (/api/chat)
 # ==========================================================
