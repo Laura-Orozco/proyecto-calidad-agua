@@ -1,8 +1,11 @@
 import os
 import io
+import json
 import time
+import random
 import urllib.request
 import urllib.parse
+from datetime import datetime, timedelta
 from typing import Optional
 from PIL import Image
 import psycopg2
@@ -522,16 +525,124 @@ async def detectar_objetos_yolo(file: UploadFile = File(...)):
 
 
 # ==========================================================
-# AGENTE DE IA NATIVO DEL DASHBOARD (/api/chat)
+# AGENTE DE IA CONVERSACIONAL DEL DASHBOARD (/api/chat)
 # ==========================================================
-@app.post("/api/chat", summary="Chat Agente IA del Dashboard")
+def formatear_hora_colombia(ts_raw) -> str:
+    """Convierte el timestamp UTC de Neon DB a hora local de Colombia (UTC-5) de forma legible."""
+    if not ts_raw:
+        return "hace un momento"
+    try:
+        dt_utc = datetime.fromisoformat(str(ts_raw)[:19])
+        dt_col = dt_utc - timedelta(hours=5)
+        return dt_col.strftime("%d/%m/%Y a las %I:%M:%S %p")
+    except Exception:
+        return str(ts_raw)[:19]
+
+
+@app.post("/api/chat", summary="Chat Agente IA Conversacional")
 async def chat_agente_ia(req: ChatRequest):
-    msg = req.mensaje.strip().lower()
+    msg_original = req.mensaje.strip()
+    msg = msg_original.lower()
+
     try:
         conn = get_db_connection()
         cur = conn.cursor()
 
-        if "historial" in msg or "ultimos" in msg or "últimos" in msg or "registros" in msg:
+        cur.execute(
+            "SELECT id, temperatura, turbidez, estado, identificador, timestamp "
+            "FROM calidad_agua ORDER BY id DESC LIMIT 1;"
+        )
+        ultima = cur.fetchone()
+
+        if not ultima:
+            cur.close()
+            conn.close()
+            return {
+                "respuesta": "Todavía no tengo lecturas guardadas en Neon PostgreSQL. En cuanto el ESP32 envíe el primer paquete de datos, te cuento cómo está todo."
+            }
+
+        temp = float(ultima["temperatura"])
+        turb = float(ultima["turbidez"])
+        estado = ultima["estado"]
+        nodo = ultima.get("identificador") or "ESP32"
+        fecha_col = formatear_hora_colombia(ultima["timestamp"])
+        pred = predecir_potabilidad(temp, turb)
+
+        # 1. Si existe GROQ_API_KEY en Render, delegar redacción natural al LLM con contexto vivo
+        groq_key = os.getenv("GROQ_API_KEY", "").strip()
+        if groq_key:
+            cur.execute("SELECT temperatura, turbidez, estado, timestamp FROM calidad_agua ORDER BY id DESC LIMIT 5;")
+            ultimos_5 = cur.fetchall()
+            cur.close()
+            conn.close()
+
+            historial_txt = "\n".join(
+                f"- {formatear_hora_colombia(r['timestamp'])}: {r['temperatura']} °C, {r['turbidez']} NTU ({r['estado']})"
+                for r in ultimos_5
+            )
+            prompt_sistema = (
+                "Eres el asistente de IA del Sistema de Monitoreo de Calidad del Agua (ESP32 + Neon DB + Random Forest H2O + YOLOv8). "
+                "Responde en español de forma natural, cercana, clara y profesional, sin usar asteriscos dobles innecesarios. "
+                f"Datos actuales en tiempo real: Nodo={nodo}, Último registro={fecha_col} (ID #{ultima['id']}), "
+                f"Temperatura={temp:.1f} °C, Turbidez={turb:.2f} NTU, Estado={estado}, "
+                f"Diagnóstico Random Forest={pred['diagnostico']} ({pred['confianza_porcentaje']}% de confianza). "
+                f"Últimos 5 registros:\n{historial_txt}"
+            )
+            payload = {
+                "model": "llama-3.1-8b-instant",
+                "messages": [
+                    {"role": "system", "content": prompt_sistema},
+                    {"role": "user", "content": msg_original}
+                ],
+                "temperature": 0.5,
+                "max_tokens": 280
+            }
+            req_llm = urllib.request.Request(
+                "https://api.groq.com/openai/v1/chat/completions",
+                data=json.dumps(payload).encode("utf-8"),
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {groq_key}"
+                }
+            )
+            with urllib.request.urlopen(req_llm, timeout=8) as r_llm:
+                data_llm = json.loads(r_llm.read().decode("utf-8"))
+                return {"respuesta": data_llm["choices"][0]["message"]["content"].strip()}
+
+        # 2. Motor conversacional natural integrado (sin dependencias externas)
+        if any(p in msg for p in ["gracias", "muchas gracias", "perfecto", "listo", "genial", "excelente", "vale"]):
+            cur.close()
+            conn.close()
+            return {
+                "respuesta": random.choice([
+                    "¡Con mucho gusto! Aquí sigo pendiente de los sensores por si necesitas revisar algo más.",
+                    "¡De nada! Si quieres evaluar otra muestra o revisar alertas anteriores, solo dime.",
+                    "¡A la orden! El monitoreo en tiempo real sigue activo."
+                ])
+            }
+
+        if any(p in msg for p in ["hola", "buenas", "buenos dias", "buenas tardes", "buenas noches", "hey", "que tal", "qué tal"]):
+            cur.close()
+            conn.close()
+            return {
+                "respuesta": (
+                    f"¡Hola! Qué gusto saludarte. Ahora mismo el sistema está en línea y el último reporte de {nodo} "
+                    f"({fecha_col}) marca {temp:.1f} °C y {turb:.2f} NTU, por lo que el agua se clasifica como {pred['diagnostico'].lower()}.\n\n"
+                    "¿Quieres que revisemos el historial, las alertas o algún parámetro específico?"
+                )
+            }
+
+        if any(p in msg for p in ["cuando", "cuándo", "hora", "fecha", "ultimo", "último", "reciente", "hace cuanto", "hace cuánto"]):
+            cur.close()
+            conn.close()
+            return {
+                "respuesta": (
+                    f"La última lectura (registro #{ultima['id']}) llegó el {fecha_col} desde el nodo {nodo}. "
+                    f"En ese momento marcó {temp:.1f} °C de temperatura y {turb:.2f} NTU de turbidez, quedando en estado {estado}."
+                )
+            }
+
+        if any(p in msg for p in ["historial", "registros", "ultimos", "últimos", "anteriores", "paso", "pasó", "movimiento"]):
             cur.execute(
                 "SELECT temperatura, turbidez, estado, timestamp "
                 "FROM calidad_agua ORDER BY id DESC LIMIT 5;"
@@ -540,68 +651,112 @@ async def chat_agente_ia(req: ChatRequest):
             cur.close()
             conn.close()
 
-            if not filas:
-                return {"respuesta": "Aún no hay registros almacenados en Neon PostgreSQL."}
-
-            lineas = ["📊 **Últimas 5 lecturas registradas en Neon DB:**"]
+            lineas = ["Estuve revisando las últimas 5 mediciones guardadas en la base de datos y esto fue lo que registró el sensor:\n"]
             for f in filas:
-                hora = str(f["timestamp"])[11:16] if f["timestamp"] else "--:--"
-                lineas.append(f"• `{hora}` → **{f['temperatura']} °C** | **{f['turbidez']} NTU** (*{f['estado']}*)")
+                h_col = formatear_hora_colombia(f["timestamp"])
+                lineas.append(f"• {h_col}: {float(f['temperatura']):.1f} °C y {float(f['turbidez']):.2f} NTU ({f['estado']})")
             return {"respuesta": "\n".join(lineas)}
 
-        cur.execute(
-            "SELECT temperatura, turbidez, estado, identificador, timestamp "
-            "FROM calidad_agua ORDER BY id DESC LIMIT 1;"
-        )
-        ultima = cur.fetchone()
-        cur.close()
-        conn.close()
+        if any(p in msg for p in ["potable", "tomar", "consumo", "contaminada", "beber", "apta", "segura", "peligrosa", "sirve"]):
+            cur.close()
+            conn.close()
+            if pred["potable"]:
+                return {
+                    "respuesta": (
+                        f"Sí, según el modelo Random Forest el agua es potable (con un {pred['confianza_porcentaje']}% de confianza). "
+                        f"Con {temp:.1f} °C y una turbidez baja de {turb:.2f} NTU, los parámetros están dentro de un rango seguro para consumo."
+                    )
+                }
+            else:
+                return {
+                    "respuesta": (
+                        f"No te recomiendo consumirla así. El modelo Random Forest la clasifica como contaminada "
+                        f"({pred['confianza_porcentaje']}% de confianza) porque registra {turb:.2f} NTU y {temp:.1f} °C. "
+                        "Lo ideal es filtrarla o realizar una purga antes de usarla."
+                    )
+                }
 
-        if not ultima:
-            return {"respuesta": "No encontré lecturas recientes del ESP32 en la base de datos."}
-
-        temp = float(ultima["temperatura"])
-        turb = float(ultima["turbidez"])
-        estado = ultima["estado"]
-        nodo = ultima.get("identificador") or "ESP32"
-        pred = predecir_potabilidad(temp, turb)
-
-        if "potable" in msg or "tomar" in msg or "consumo" in msg or "contaminada" in msg:
-            icono = "✅" if pred["potable"] else "🚨"
-            consejo = (
-                "Los niveles están dentro de parámetros seguros."
-                if pred["potable"]
-                else "Se recomienda activar purga o filtración antes de su uso."
-            )
+        if any(p in msg for p in ["temperatura", "calor", "frio", "frío", "grados", "termica", "térmica", "caliente"]):
+            cur.close()
+            conn.close()
+            sensacion = "un poco elevada" if temp > 30 else ("bastante fresca" if temp < 20 else "en un rango normal y estable")
             return {
                 "respuesta": (
-                    f"{icono} **Diagnóstico Random Forest H2O:**\n"
-                    f"El agua se clasifica como **{pred['diagnostico'].upper()}** "
-                    f"con un **{pred['confianza_porcentaje']}%** de confianza.\n\n"
-                    f"• **Base evaluada:** {temp:.1f} °C y {turb:.2f} NTU.\n"
-                    f"• **Recomendación:** {consejo}"
+                    f"El sensor DS18B20 marca actualmente {temp:.1f} °C, lo cual está {sensacion}. "
+                    f"Esa medición se tomó el {fecha_col}."
                 )
             }
 
-        if "temperatura" in msg or "calor" in msg or "grados" in msg:
+        if any(p in msg for p in ["turbidez", "turbia", "ntu", "sucia", "clara", "limpia", "opaca"]):
+            cur.close()
+            conn.close()
+            nivel_txt = (
+                "muy alta (por encima del límite crítico de 20 NTU)"
+                if turb > 20
+                else ("moderada, así que conviene vigilarla" if turb > 5 else "bastante baja y cristalina")
+            )
             return {
-                "respuesta": f"🌡️ La temperatura actual registrada por **{nodo}** es de **{temp:.1f} °C** (Estado operativo: *{estado}*)."
+                "respuesta": (
+                    f"La turbidez está en {turb:.2f} NTU, es decir, {nivel_txt}. "
+                    f"El sistema la tiene catalogada en estado {estado}."
+                )
             }
 
-        if "turbidez" in msg or "turbia" in msg or "ntu" in msg:
+        if any(p in msg for p in ["alerta", "alertas", "critica", "crítica", "incidente", "emergencia", "problema"]):
+            cur.execute(
+                "SELECT temperatura, turbidez, timestamp FROM calidad_agua "
+                "WHERE LOWER(estado) LIKE '%crit%' OR turbidez > 20 ORDER BY id DESC LIMIT 3;"
+            )
+            alertas = cur.fetchall()
+            cur.close()
+            conn.close()
+
+            if not alertas:
+                return {
+                    "respuesta": "Buenas noticias: no hay alertas críticas registradas recientemente. El sistema ha estado operando con normalidad."
+                }
+            lineas = ["Detecté estas alertas críticas recientes en el historial:\n"]
+            for a in alertas:
+                lineas.append(f"• {formatear_hora_colombia(a['timestamp'])}: {float(a['temperatura']):.1f} °C y {float(a['turbidez']):.2f} NTU.")
+            return {"respuesta": "\n".join(lineas)}
+
+        if any(p in msg for p in ["promedio", "media", "estadistica", "estadística", "total", "cuantos", "cuántos", "resumen"]):
+            cur.execute(
+                "SELECT COUNT(*) AS total, AVG(temperatura) AS avg_t, AVG(turbidez) AS avg_tb "
+                "FROM calidad_agua;"
+            )
+            st = cur.fetchone()
+            cur.close()
+            conn.close()
             return {
-                "respuesta": f"💧 El sensor óptico registra una turbidez de **{turb:.2f} NTU** (Umbral crítico: > 10.0 NTU • Estado: *{estado}*)."
+                "respuesta": (
+                    f"En total llevamos {st['total']} registros almacenados en Neon DB. "
+                    f"En promedio, el agua se ha mantenido alrededor de {float(st['avg_t'] or 0):.1f} °C "
+                    f"y {float(st['avg_tb'] or 0):.2f} NTU."
+                )
             }
 
+        if any(p in msg for p in ["modelo", "precision", "precisión", "exactitud", "accuracy", "random forest", "h2o", "yolo"]):
+            cur.close()
+            conn.close()
+            m = obtener_metricas_modelo()
+            return {
+                "respuesta": (
+                    f"Nuestro modelo Random Forest (entrenado con H2O) tiene una exactitud global del {m.get('accuracy', 93.41)}% "
+                    f"y un recall del {m.get('recall', 99.75)}% para detectar agua potable. Además, en el módulo visual usamos "
+                    "Grad-CAM XAI junto con YOLOv8 para identificar sedimentos, algas o residuos plásticos."
+                )
+            }
+
+        cur.close()
+        conn.close()
         return {
             "respuesta": (
-                f"¡Hola! Analizando los datos en tiempo real de **{nodo}**:\n\n"
-                f"🌡️ **Temperatura:** {temp:.1f} °C\n"
-                f"💧 **Turbidez:** {turb:.2f} NTU (*{estado}*)\n"
-                f"🤖 **Modelo Random Forest:** Clasifica el agua como **{pred['diagnostico']}** "
-                f"con **{pred['confianza_porcentaje']}%** de confianza.\n\n"
-                f"¿Deseas revisar el historial o evaluar algún parámetro en particular?"
+                f"Ahora mismo el sistema reporta {temp:.1f} °C y {turb:.2f} NTU (tomado el {fecha_col}), "
+                f"con un diagnóstico de {pred['diagnostico'].lower()} ({pred['confianza_porcentaje']}% de confianza).\n\n"
+                "Si buscas algún dato puntual —como el historial, alertas críticas o promedios—, dime con confianza."
             )
         }
+
     except Exception as e:
-        return {"respuesta": f"⚠️ Ocurrió un error consultando la telemetría: {str(e)}"}
+        return {"respuesta": f"Tuve un inconveniente consultando la base de datos en este momento: {str(e)}"}
