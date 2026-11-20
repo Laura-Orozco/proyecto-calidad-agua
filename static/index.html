@@ -1264,18 +1264,29 @@
           const w = nw * canvasYolo.width;
           const h = nh * canvasYolo.height;
 
-          ctx.strokeStyle = det.color || "#3b82f6";
-          ctx.lineWidth = Math.max(3, canvasYolo.width * 0.005);
+          const dimBase = Math.max(canvasYolo.width, canvasYolo.height);
+          const grosorLinea = Math.max(4, Math.round(dimBase * 0.007));
+          const fontSize = Math.max(18, Math.round(dimBase * 0.038));
+          const padX = Math.round(fontSize * 0.45);
+          const boxHeight = Math.round(fontSize * 1.45);
+
+          ctx.strokeStyle = det.color || "#10b981";
+          ctx.lineWidth = grosorLinea;
           ctx.strokeRect(x, y, w, h);
 
           const textoBox = `${det.etiqueta} ${det.confianza}%`;
-          ctx.font = `bold ${Math.max(14, canvasYolo.width * 0.024)}px sans-serif`;
+          ctx.font = `bold ${fontSize}px sans-serif`;
           const textWidth = ctx.measureText(textoBox).width;
-          ctx.fillStyle = det.color || "#3b82f6";
-          ctx.fillRect(x, Math.max(0, y - 26), textWidth + 12, 26);
+
+          const boxX = Math.min(x, Math.max(0, canvasYolo.width - textWidth - padX * 2));
+          const boxY = Math.max(0, y - boxHeight);
+
+          ctx.fillStyle = det.color || "#10b981";
+          ctx.fillRect(boxX, boxY, textWidth + padX * 2, boxHeight);
 
           ctx.fillStyle = "#ffffff";
-          ctx.fillText(textoBox, x + 6, Math.max(18, y - 7));
+          ctx.textBaseline = "middle";
+          ctx.fillText(textoBox, boxX + padX, boxY + boxHeight / 2);
 
           const item = document.createElement("div");
           item.style.cssText = "display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border-radius:8px; background:var(--bg-inner); border:1px solid var(--border-card); border-left:4px solid " + det.color;
