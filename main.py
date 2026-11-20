@@ -43,7 +43,7 @@ DATABASE_URL = os.getenv(
     "DATABASE_URL",
     "postgresql://neondb_owner:npg_7zH0aKqjGtyX@ep-icy-glitter-a5u8p0u1-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require"
 )
-THINGSPEAK_WRITE_API_KEY = os.getenv("THINGSPEAK_WRITE_API_KEY", "")
+THINGSPEAK_WRITE_API_KEY = os.getenv("THINGSPEAK_WRITE_API_KEY", "H20B180D9AB4YGYH")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL", "https://proyecto-calidad-agua.onrender.com")
 
@@ -133,7 +133,7 @@ async def servir_dashboard():
 def sincronizar_thingspeak(temp: float, turb: float):
     api_key = os.getenv("THINGSPEAK_WRITE_API_KEY", THINGSPEAK_WRITE_API_KEY).strip()
     if not api_key:
-        print("[ThingSpeak] OMITIDO: Falta variable THINGSPEAK_WRITE_API_KEY en Render")
+        print("[ThingSpeak] OMITIDO: Falta variable THINGSPEAK_WRITE_API_KEY")
         return
     try:
         params = urllib.parse.urlencode({
