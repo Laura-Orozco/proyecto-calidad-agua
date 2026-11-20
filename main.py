@@ -89,7 +89,7 @@ COLORES_CLASES_YOLO = {
     "agua_limpia": ("Agua Limpia", "#3b82f6"),
     "residuo_plastico": ("Residuo Plástico", "#ef4444"),
     "capa_biofilm_alga": ("Capa Biofilm / Alga", "#10b981"),
-    "sedimento_espuma": ("Sedimento / Espuma", "#f59e0b"),
+    "sedimento_espuma": ("Sedimentos / Turbidez", "#f59e0b"),
 }
 
 
@@ -472,16 +472,27 @@ async def detectar_objetos_yolo(file: UploadFile = File(...)):
                 })
                 tipo_agua_general = "Agua Contaminada con Algas / Biofilm"
 
-            # Sedimento / Espuma (tonos marrones, amarillentos o espuma densa)
+            # Sedimentos / Turbidez vs. Espuma superficial
             elif ((r_avg + g_avg) / 2.0) > b_avg + 14:
+                top_pixels = pixels[:320]
+                brillo_top = sum(sum(p) / 3.0 for p in top_pixels) / len(top_pixels)
+                tiene_espuma = brillo_top > 185
+
+                etiqueta_final = "Sedimento / Espuma" if tiene_espuma else "Sedimentos / Turbidez"
+                tipo_general = (
+                    "Agua Turbia con Sedimentos y Espuma"
+                    if tiene_espuma
+                    else "Agua Turbia con Sedimentos Suspendidos"
+                )
+
                 detecciones.append({
                     "clase": "sedimento_espuma",
-                    "etiqueta": "Sedimento / Espuma",
+                    "etiqueta": etiqueta_final,
                     "confianza": 89.4,
                     "color": "#f59e0b",
                     "bbox": [0.22, 0.26, 0.56, 0.48]
                 })
-                tipo_agua_general = "Agua Turbia con Sedimentos y Espuma"
+                tipo_agua_general = tipo_general
 
             # Residuo plástico (alta varianza puntual sin coloración uniforme)
             brillos = [sum(p) / 3.0 for p in pixels]
